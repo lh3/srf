@@ -7,6 +7,7 @@
 #include "khashl.h"
 #include "ketopt.h"
 #include "kseq.h"
+#include "ksort.h"
 
 #define Malloc(type, cnt)       ((type*)malloc((cnt) * sizeof(type)))
 #define Calloc(type, cnt)       ((type*)calloc((cnt), sizeof(type)))
@@ -17,6 +18,7 @@ KSTREAM_INIT(gzFile, gzread, 0x10000)
 typedef struct {
 	uint32_t cnt;
 	int32_t len;
+	uint32_t k, used;
 	uint8_t *seq[2];
 } ca_kmer_t;
 
@@ -31,6 +33,9 @@ static inline uint32_t ca_kmer_hash(const ca_kmer_t x)
 }
 
 KHASHL_CSET_INIT(, ca_kh_t, ca_kh, ca_kmer_t, ca_kmer_hash, ca_kmer_eq)
+
+#define kmer_key(x) ((x).cnt)
+KRADIX_SORT_INIT(ca_kmer, ca_kmer_t, kmer_key, 4)
 
 unsigned char seq_nt4_table[256] = {
 	0, 1, 2, 3,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
@@ -115,6 +120,27 @@ ca_kh_t *ca_kmer_read(const char *fn)
 	return h;
 }
 
+void ca_gen(ca_kh_t *h)
+{
+	int32_t i, n;
+	khint_t k;
+	ca_kmer_t *a;
+	n = kh_size(h);
+	a = Malloc(ca_kmer_t, n);
+	for (k = 0, i = 0; k != kh_end(h); ++k)
+		if (kh_exist(h, k))
+			kh_key(h, k).k = k, kh_key(h, k).used = 0, a[i++] = kh_key(h, k);
+	radix_sort_ca_kmer(a, a + n);
+	for (i = 0; i < n>>1; ++i) {
+		ca_kmer_t t = a[i];
+		a[i] = a[n - 1 - i], a[n - 1 - i] = t;
+	}
+	for (i = 0; i < n; ++i) {
+		printf("%d\n", a[i].cnt);
+	}
+	free(a);
+}
+
 int main(int argc, char *argv[])
 {
 	int32_t c;
@@ -128,5 +154,6 @@ int main(int argc, char *argv[])
 	}
 	h = ca_kmer_read(argv[o.ind]);
 	fprintf(stderr, "[M::%s] read %d distinct k-mers\n", __func__, kh_size(h));
+	ca_gen(h);
 	return 0;
 }
