@@ -23,15 +23,16 @@ typedef struct {
 
 int main(int argc, char *argv[])
 {
-	int c, min_occ = 100, depth = 51, i, n = 0;
+	int c, min_occ = 100, depth = 51, i, n = 0, use_mmap = 0;
 	pair64_t *p;
 	aux_t *aux;
 	char *str;
 	ketopt_t o = KETOPT_INIT;
 
-	while ((c = ketopt(&o, argc, argv, 1, "k:m:", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "k:m:M", 0)) >= 0) {
 		if (c == 'k') depth = atol(o.arg);
 		else if (c == 'm') min_occ = atol(o.arg);
+		else if (c == 'M') use_mmap = 1;
 	}
 	if (o.ind == argc) {
 		fprintf(stderr, "Usage: fmd-occ [options] <in1.fmd> [in2.fmd [...]]\n");
@@ -45,7 +46,7 @@ int main(int argc, char *argv[])
 	aux = Calloc(aux_t, n);
 	for (i = 0; i < n; ++i) {
 		aux_t *q = &aux[i];
-		q->e = rld_restore(argv[o.ind + i]);
+		q->e = use_mmap? rld_restore_mmap(argv[o.ind + i]) : rld_restore(argv[o.ind + i]);
 		assert(q->e);
 		q->stack = Calloc(pair64_t, depth + 1);
 		p = &q->stack[q->s_top++];

@@ -151,7 +151,7 @@ void ca_gen(ca_kh_t *h)
 		if (kh_exist(h, k))
 			kh_key(h, k).k = k, kh_key(h, k).flag = (uint32_t)-1, a[i++] = (uint64_t)kh_key(h, k).cnt<<32 | k;
 	radix_sort_ca64(a, a + n);
-	for (i = 0; i < n>>1; ++i) {
+	for (i = 0; i < n>>1; ++i) { // change to the descending order
 		uint64_t t = a[i];
 		a[i] = a[n - 1 - i], a[n - 1 - i] = t;
 	}
@@ -166,7 +166,7 @@ void ca_gen(ca_kh_t *h)
 	for (i = 0; i < n; ++i) {
 		khint_t k0 = (uint32_t)a[i];
 		ca_kmer_t *q = &kh_key(h, k0);
-		int32_t j, done;
+		int32_t done;
 
 		if (q->flag != (uint32_t)-1) continue;
 		q->flag = k0;
@@ -197,7 +197,8 @@ void ca_gen(ca_kh_t *h)
 				break;
 			}
 			for (c = 0; c < 4; ++c)
-				kh_key(h, kk[c]).flag = k0;
+				if (kk[c] != kh_end(h))
+					kh_key(h, kk[c]).flag = k0;
 			if (l_seq == m_seq) {
 				m_seq += (m_seq>>1) + 16;
 				seq = Realloc(uint8_t, seq, m_seq);
@@ -206,6 +207,7 @@ void ca_gen(ca_kh_t *h)
 			q = &kh_key(h, kk[max_c]);
 		}
 		if (done) {
+			int32_t j;
 			for (j = 0; j < l_seq; ++j)
 				seq[j] = "ACGT"[seq[j]];
 			fwrite(seq, 1, l_seq, stdout);
