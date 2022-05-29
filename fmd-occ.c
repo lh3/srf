@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 		aux_t *q = &aux[i];
 		q->e = use_mmap? rld_restore_mmap(argv[o.ind + i]) : rld_restore(argv[o.ind + i]);
 		assert(q->e);
-		q->stack = Calloc(pair64_t, depth + 1);
+		q->stack = Calloc(pair64_t, (depth + 1) * 4);
 		p = &q->stack[q->s_top++];
 		p->k = 0, p->l = q->e->mcnt[0], p->d = p->c = 0;
 	}
