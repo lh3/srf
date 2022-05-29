@@ -169,7 +169,6 @@ void ca_gen(ca_kh_t *h)
 		int32_t done;
 
 		if (q->flag != (uint32_t)-1) continue;
-		q->flag = k0;
 
 		if (q->len >= m_seq) {
 			m_seq = q->len * 2;
@@ -181,6 +180,7 @@ void ca_gen(ca_kh_t *h)
 		while (1) {
 			int32_t cnt[4], max, c, max_c;
 			khint_t kk[4];
+			q->flag = k0;
 			for (c = 0; c < 4; ++c) {
 				khint_t k;
 				ca_kmer_append(&t, q->len, &seq[l_seq - q->len + 1], c, swap);
@@ -196,19 +196,17 @@ void ca_gen(ca_kh_t *h)
 				done = 1;
 				break;
 			}
-			for (c = 0; c < 4; ++c)
-				if (kk[c] != kh_end(h))
-					kh_key(h, kk[c]).flag = k0;
 			if (l_seq == m_seq) {
 				m_seq += (m_seq>>1) + 16;
 				seq = Realloc(uint8_t, seq, m_seq);
 			}
 			seq[l_seq++] = max_c;
 			q = &kh_key(h, kk[max_c]);
+			if (q->flag != (uint32_t)-1) break;
 		}
 		if (done) {
 			int32_t j;
-			for (j = 0; j < l_seq; ++j)
+			for (j = 0; j < l_seq - q->len; ++j)
 				seq[j] = "ACGT"[seq[j]];
 			fwrite(seq, 1, l_seq, stdout);
 			putchar('\n');
