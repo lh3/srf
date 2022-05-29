@@ -40,4 +40,6 @@ depend:
 
 # DO NOT DELETE
 
-circasm.o: khashl.h ketopt.h kseq.h
+circasm.o: khashl.h ketopt.h kseq.h ksort.h
+fmd-occ.o: ketopt.h rld0.h
+rld0.o: rld0.h
