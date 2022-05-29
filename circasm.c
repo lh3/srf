@@ -18,6 +18,40 @@ KSTREAM_INIT(gzFile, gzread, 0x10000)
 #define generic_key(x) (x)
 KRADIX_SORT_INIT(ca64, uint64_t, generic_key, 8)
 
+static inline uint32_t murmur_32_scramble(uint32_t k) {
+    k *= 0xcc9e2d51;
+    k = (k << 15) | (k >> 17);
+    k *= 0x1b873593;
+    return k;
+}
+
+uint32_t murmur3_32(const uint8_t* key, size_t len, uint32_t seed)
+{
+	uint32_t h = seed;
+    uint32_t k;
+	size_t i;
+    for (i = len >> 2; i; i--) {
+        memcpy(&k, key, sizeof(uint32_t));
+        key += sizeof(uint32_t);
+        h ^= murmur_32_scramble(k);
+        h = (h << 13) | (h >> 19);
+        h = h * 5 + 0xe6546b64;
+    }
+    k = 0;
+    for (i = len & 3; i; i--) {
+        k <<= 8;
+        k |= key[i - 1];
+    }
+    h ^= murmur_32_scramble(k);
+	h ^= len;
+	h ^= h >> 16;
+	h *= 0x85ebca6b;
+	h ^= h >> 13;
+	h *= 0xc2b2ae35;
+	h ^= h >> 16;
+	return h;
+}
+
 typedef struct {
 	uint32_t cnt;
 	int32_t len;
@@ -32,7 +66,7 @@ static inline int32_t ca_kmer_eq(const ca_kmer_t x, const ca_kmer_t y)
 
 static inline uint32_t ca_kmer_hash(const ca_kmer_t x)
 {
-	return kh_hash_bytes(x.len, x.seq[0]);
+	return murmur3_32(x.seq[0], x.len, 11);
 }
 
 KHASHL_CSET_INIT(, ca_kh_t, ca_kh, ca_kmer_t, ca_kmer_hash, ca_kmer_eq)
@@ -209,7 +243,7 @@ void ca_gen(ca_kh_t *h)
 			int32_t j;
 			for (j = 0; j < l_seq - q->len; ++j)
 				seq[j] = "ACGT"[seq[j]];
-			fwrite(seq, 1, l_seq, stdout);
+			fwrite(seq, 1, l_seq - q->len, stdout);
 			putchar('\n');
 		}
 	}
