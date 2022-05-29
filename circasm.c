@@ -241,9 +241,9 @@ void ca_gen(ca_kh_t *h)
 		}
 		if (done) {
 			int32_t j;
-			for (j = 0; j < l_seq - q->len; ++j)
+			for (j = 0; j < l_seq - q->len + 1; ++j)
 				seq[j] = "ACGT"[seq[j]];
-			fwrite(seq, 1, l_seq - q->len, stdout);
+			fwrite(seq, 1, l_seq - q->len + 1, stdout);
 			putchar('\n');
 		}
 	}
