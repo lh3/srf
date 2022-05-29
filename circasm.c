@@ -15,6 +15,9 @@
 
 KSTREAM_INIT(gzFile, gzread, 0x10000)
 
+#define generic_key(x) (x)
+KRADIX_SORT_INIT(ca64, uint64_t, generic_key, 8)
+
 typedef struct {
 	uint32_t cnt;
 	int32_t len;
@@ -33,9 +36,6 @@ static inline uint32_t ca_kmer_hash(const ca_kmer_t x)
 }
 
 KHASHL_CSET_INIT(, ca_kh_t, ca_kh, ca_kmer_t, ca_kmer_hash, ca_kmer_eq)
-
-#define kmer_key(x) ((x).cnt)
-KRADIX_SORT_INIT(ca_kmer, ca_kmer_t, kmer_key, 4)
 
 void ca_kmer_canonical(ca_kmer_t *t, uint8_t *swap)
 {
@@ -139,34 +139,32 @@ ca_kh_t *ca_kmer_read(const char *fn)
 void ca_gen(ca_kh_t *h)
 {
 	int32_t i, n, l_seq, m_seq;
-	khint_t k, *b;
-	ca_kmer_t *a, t;
+	uint64_t *a;
+	khint_t k;
+	ca_kmer_t t;
 	uint8_t *seq, *swap;
 
 	n = kh_size(h);
-	a = Malloc(ca_kmer_t, n);
+	if (n == 0) return;
+	a = Malloc(uint64_t, n);
 	for (k = 0, i = 0; k != kh_end(h); ++k)
 		if (kh_exist(h, k))
-			kh_key(h, k).k = k, kh_key(h, k).flag = (uint32_t)-1, a[i++] = kh_key(h, k);
-	radix_sort_ca_kmer(a, a + n);
+			kh_key(h, k).k = k, kh_key(h, k).flag = (uint32_t)-1, a[i++] = (uint64_t)kh_key(h, k).cnt<<32 | k;
+	radix_sort_ca64(a, a + n);
 	for (i = 0; i < n>>1; ++i) {
-		ca_kmer_t t = a[i];
+		uint64_t t = a[i];
 		a[i] = a[n - 1 - i], a[n - 1 - i] = t;
 	}
-	b = Calloc(khint_t, n);
-	for (i = 0; i < n; ++i)
-		b[i] = a[i].k;
 
-	t = a[0];
+	t = kh_key(h, (uint32_t)a[0]);
 	t.seq[0] = Calloc(uint8_t, t.len * 2);
 	t.seq[1] = t.seq[0] + t.len;
 	swap = Calloc(uint8_t, t.len);
-	free(a);
 
 	l_seq = m_seq = 0;
 	seq = 0;
 	for (i = 0; i < n; ++i) {
-		khint_t k0 = b[i];
+		khint_t k0 = (uint32_t)a[i];
 		ca_kmer_t *q = &kh_key(h, k0);
 		int32_t j, done;
 
@@ -215,7 +213,7 @@ void ca_gen(ca_kh_t *h)
 		}
 	}
 	free(seq);
-	free(b);
+	free(a);
 	free(swap);
 }
 
