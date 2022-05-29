@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <assert.h>
 #include "ketopt.h"
 #include "rld0.h"
 
@@ -28,14 +29,14 @@ int main(int argc, char *argv[])
 	char *str;
 	ketopt_t o = KETOPT_INIT;
 
-	while ((c = ketopt(&o, argc, argv, 1, "d:o:", 0)) >= 0) {
-		if (c == 'd') depth = atol(o.arg);
-		else if (c == 'o') min_occ = atol(o.arg);
+	while ((c = ketopt(&o, argc, argv, 1, "k:m:", 0)) >= 0) {
+		if (c == 'k') depth = atol(o.arg);
+		else if (c == 'm') min_occ = atol(o.arg);
 	}
 	if (o.ind == argc) {
-		fprintf(stderr, "Usage: fmd-occ <in1.fmd> [in2.fmd [...]]\n");
+		fprintf(stderr, "Usage: fmd-occ [options] <in1.fmd> [in2.fmd [...]]\n");
 		fprintf(stderr, "Options:\n");
-		fprintf(stderr, "  -d INT       k-mer length [%d]\n", depth);
+		fprintf(stderr, "  -k INT       k-mer length [%d]\n", depth);
 		fprintf(stderr, "  -m INT       min k-mer occurrence [%d]\n", min_occ);
 		return 1;
 	}
@@ -45,6 +46,7 @@ int main(int argc, char *argv[])
 	for (i = 0; i < n; ++i) {
 		aux_t *q = &aux[i];
 		q->e = rld_restore(argv[o.ind + i]);
+		assert(q->e);
 		q->stack = Calloc(pair64_t, depth + 1);
 		p = &q->stack[q->s_top++];
 		p->k = 0, p->l = q->e->mcnt[0], p->d = p->c = 0;
