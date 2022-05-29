@@ -18,7 +18,7 @@ KSTREAM_INIT(gzFile, gzread, 0x10000)
 typedef struct {
 	uint32_t cnt;
 	int32_t len;
-	uint32_t k, used;
+	uint32_t k, flag;
 	uint8_t *seq[2];
 } ca_kmer_t;
 
@@ -36,6 +36,26 @@ KHASHL_CSET_INIT(, ca_kh_t, ca_kh, ca_kmer_t, ca_kmer_hash, ca_kmer_eq)
 
 #define kmer_key(x) ((x).cnt)
 KRADIX_SORT_INIT(ca_kmer, ca_kmer_t, kmer_key, 4)
+
+void ca_kmer_canonical(ca_kmer_t *t, uint8_t *swap)
+{
+	if (memcmp(t->seq[0], t->seq[1], t->len) > 0) {
+		memcpy(swap, t->seq[0], t->len);
+		memcpy(t->seq[0], t->seq[1], t->len);
+		memcpy(t->seq[1], swap, t->len);
+	}
+}
+
+void ca_kmer_append(ca_kmer_t *t, int32_t len, const uint8_t *seq, int32_t c, uint8_t *swap)
+{
+	int32_t i;
+	t->len = len;
+	memcpy(t->seq[0], seq, len - 1);
+	t->seq[0][len - 1] = c;
+	for (i = 0; i < len; ++i)
+		t->seq[1][len - i - 1] = 3 - t->seq[0][i];
+	ca_kmer_canonical(t, swap);
+}
 
 unsigned char seq_nt4_table[256] = {
 	0, 1, 2, 3,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
@@ -99,11 +119,7 @@ ca_kh_t *ca_kmer_read(const char *fn)
 			kmer.seq[1][kmer.len - 1 - i] = 3 - c;
 		}
 		if (i < kmer.len) continue;
-		if (memcmp(kmer.seq[0], kmer.seq[1], kmer.len) > 0) {
-			memcpy(swap, kmer.seq[0], kmer.len);
-			memcpy(kmer.seq[0], kmer.seq[1], kmer.len);
-			memcpy(kmer.seq[1], swap, kmer.len);
-		}
+		ca_kmer_canonical(&kmer, swap);
 		k = ca_kh_put(h, kmer, &absent);
 		if (absent) {
 			ca_kmer_t *q = &kh_key(h, k);
@@ -122,23 +138,85 @@ ca_kh_t *ca_kmer_read(const char *fn)
 
 void ca_gen(ca_kh_t *h)
 {
-	int32_t i, n;
-	khint_t k;
-	ca_kmer_t *a;
+	int32_t i, n, l_seq, m_seq;
+	khint_t k, *b;
+	ca_kmer_t *a, t;
+	uint8_t *seq, *swap;
+
 	n = kh_size(h);
 	a = Malloc(ca_kmer_t, n);
 	for (k = 0, i = 0; k != kh_end(h); ++k)
 		if (kh_exist(h, k))
-			kh_key(h, k).k = k, kh_key(h, k).used = 0, a[i++] = kh_key(h, k);
+			kh_key(h, k).k = k, kh_key(h, k).flag = (uint32_t)-1, a[i++] = kh_key(h, k);
 	radix_sort_ca_kmer(a, a + n);
 	for (i = 0; i < n>>1; ++i) {
 		ca_kmer_t t = a[i];
 		a[i] = a[n - 1 - i], a[n - 1 - i] = t;
 	}
-	for (i = 0; i < n; ++i) {
-		printf("%d\n", a[i].cnt);
-	}
+	b = Calloc(khint_t, n);
+	for (i = 0; i < n; ++i)
+		b[i] = a[i].k;
+
+	t = a[0];
+	t.seq[0] = Calloc(uint8_t, t.len * 2);
+	t.seq[1] = t.seq[0] + t.len;
+	swap = Calloc(uint8_t, t.len);
 	free(a);
+
+	l_seq = m_seq = 0;
+	seq = 0;
+	for (i = 0; i < n; ++i) {
+		khint_t k0 = b[i];
+		ca_kmer_t *q = &kh_key(h, k0);
+		int32_t j, done;
+
+		if (q->flag != (uint32_t)-1) continue;
+		q->flag = k0;
+
+		if (q->len >= m_seq) {
+			m_seq = q->len * 2;
+			seq = Calloc(uint8_t, m_seq);
+		}
+		memcpy(seq, q->seq[0], q->len);
+		l_seq = q->len;
+		done = 0;
+		while (1) {
+			int32_t cnt[4], max, c, max_c;
+			khint_t kk[4];
+			for (c = 0; c < 4; ++c) {
+				khint_t k;
+				ca_kmer_append(&t, q->len, &seq[l_seq - q->len + 1], c, swap);
+				kk[c] = k = ca_kh_get(h, t);
+				cnt[c] = k != kh_end(h)? kh_key(h, k).cnt : 0;
+			}
+			for (c = 0, max = 0, max_c = -1; c < 4; ++c)
+				if (cnt[c] > max)
+					max = cnt[c], max_c = c;
+			if (max == 0) break;
+			ca_kmer_append(&t, q->len, &seq[l_seq - q->len + 1], max_c, swap);
+			if (ca_kmer_eq(kh_key(h, k0), t)) {
+				done = 1;
+				break;
+			}
+			for (c = 0; c < 4; ++c)
+				kh_key(h, kk[c]).flag = k0;
+			if (l_seq == m_seq) {
+				m_seq += (m_seq>>1) + 16;
+				seq = Realloc(uint8_t, seq, m_seq);
+			}
+			seq[l_seq++] = max_c;
+			q = &kh_key(h, kk[max_c]);
+		}
+		if (done) {
+			for (j = 0; j < l_seq; ++j)
+				seq[j] = "ACGT"[seq[j]];
+			fwrite(seq, 1, l_seq, stdout);
+			putchar('\n');
+		}
+	}
+	free(seq);
+	free(b);
+	free(swap);
 }
 
 int main(int argc, char *argv[])
