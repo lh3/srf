@@ -181,6 +181,7 @@ void ca_gen(ca_kh_t *h)
 			int32_t cnt[4], max, c, max_c;
 			khint_t kk[4];
 			q->flag = k0;
+			//fprintf(stderr, "X\t%d\t%d\t%d\n", i, q->cnt, l_seq);
 			for (c = 0; c < 4; ++c) {
 				khint_t k;
 				ca_kmer_append(&t, q->len, &seq[l_seq - q->len + 1], c, swap);
