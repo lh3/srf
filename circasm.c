@@ -64,7 +64,7 @@ ca_kh_t *ca_kmer_read(const char *fn)
 	kstring_t str = {0,0,0};
 	int32_t dret;
 	ca_kmer_t kmer;
-	uint8_t *swap;
+	uint8_t *swap = 0;
 
 	fp = gzopen(fn, "rb");
 	if (fp == 0) return 0;
@@ -95,8 +95,8 @@ ca_kh_t *ca_kmer_read(const char *fn)
 		for (i = 0; i < kmer.len; ++i) {
 			int32_t c = seq_nt4_table[(uint8_t)str.s[i]];
 			if (c >= 4) break;
-			kmer.seq[0][i] = c;
-			kmer.seq[1][kmer.len - 1 - i] = 3 - c;
+			kmer.seq[0][kmer.len - 1 - i] = c; // the cnt_occ output is reversed but not complemented
+			kmer.seq[1][i] = 3 - c;
 		}
 		if (i < kmer.len) continue;
 		if (memcmp(kmer.seq[0], kmer.seq[1], kmer.len) > 0) {

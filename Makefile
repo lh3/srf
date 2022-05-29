@@ -5,7 +5,7 @@ CXXFLAGS=	$(CFLAGS)
 CPPFLAGS=
 INCLUDES=
 OBJS=
-PROG=		circasm
+PROG=		circasm fmd-occ
 LIBS=		-lz
 
 WFA_ROOT=WFA2-lib
@@ -24,9 +24,12 @@ endif
 .cpp.o:
 		$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $(INCLUDES) $< -o $@
 
-all:circasm
+all:$(PROG)
 
 circasm:$(OBJS) circasm.o
+		$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
+
+fmd-occ:rld0.o fmd-occ.o
 		$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
 
 clean:
