@@ -170,9 +170,9 @@ ca_kh_t *ca_kmer_read(const char *fn)
 	return h;
 }
 
-void ca_gen(ca_kh_t *h)
+void ca_gen(ca_kh_t *h, const char *prefix)
 {
-	int32_t i, n, l_seq, m_seq;
+	int32_t i, n, l_seq, m_seq, n_circ = 0;
 	uint64_t *a;
 	khint_t k;
 	ca_kmer_t t;
@@ -200,7 +200,7 @@ void ca_gen(ca_kh_t *h)
 	for (i = 0; i < n; ++i) {
 		khint_t k0 = (uint32_t)a[i];
 		ca_kmer_t *q = &kh_key(h, k0);
-		int32_t done;
+		int32_t done, min_cnt, max_cnt;
 
 		if (q->flag != (uint32_t)-1) continue;
 
@@ -210,11 +210,14 @@ void ca_gen(ca_kh_t *h)
 		}
 		memcpy(seq, q->seq[0], q->len);
 		l_seq = q->len;
+		min_cnt = max_cnt = q->cnt;
 		done = 0;
 		while (1) {
 			int32_t cnt[4], max, c, max_c;
 			khint_t kk[4];
 			q->flag = k0;
+			min_cnt = min_cnt < q->cnt? min_cnt : q->cnt;
+			max_cnt = max_cnt > q->cnt? max_cnt : q->cnt;
 			//fprintf(stderr, "X\t%d\t%d\t%d\n", i, q->cnt, l_seq);
 			for (c = 0; c < 4; ++c) {
 				khint_t k;
@@ -241,6 +244,10 @@ void ca_gen(ca_kh_t *h)
 		}
 		if (done) {
 			int32_t j;
+			++n_circ;
+			putchar('>');
+			if (prefix) printf("%s#", prefix);
+			printf("circ%d-%d min=%d,max=%d\n", n_circ, l_seq - q->len + 1, min_cnt, max_cnt);
 			for (j = 0; j < l_seq - q->len + 1; ++j)
 				seq[j] = "ACGT"[seq[j]];
 			fwrite(seq, 1, l_seq - q->len + 1, stdout);
@@ -257,7 +264,9 @@ int main(int argc, char *argv[])
 	int32_t c;
 	ketopt_t o = KETOPT_INIT;
 	ca_kh_t *h;
-	while ((c = ketopt(&o, argc, argv, 1, "", 0)) >= 0) {
+	char *prefix = 0;
+	while ((c = ketopt(&o, argc, argv, 1, "p:", 0)) >= 0) {
+		if (c == 'p') prefix = o.arg;
 	}
 	if (o.ind == argc) {
 		fprintf(stderr, "Usage: circasm <in.txt>\n");
@@ -265,6 +274,6 @@ int main(int argc, char *argv[])
 	}
 	h = ca_kmer_read(argv[o.ind]);
 	fprintf(stderr, "[M::%s] read %d distinct k-mers\n", __func__, kh_size(h));
-	ca_gen(h);
+	ca_gen(h, prefix);
 	return 0;
 }
