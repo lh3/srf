@@ -160,7 +160,7 @@ ca_kh_t *ca_kmer_read(const char *fn)
 			q->seq[0] = Malloc(uint8_t, kmer.len * 2);
 			q->seq[1] = q->seq[0] + kmer.len;
 			memcpy(q->seq[0], kmer.seq[0], kmer.len * 2);
-		}
+		} else kh_key(h, k).cnt += cnt;
 	}
 	free(str.s);
 	free(swap);
