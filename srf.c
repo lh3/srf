@@ -269,7 +269,9 @@ int main(int argc, char *argv[])
 		if (c == 'p') prefix = o.arg;
 	}
 	if (o.ind == argc) {
-		fprintf(stderr, "Usage: circasm <in.txt>\n");
+		fprintf(stderr, "Usage: srf [options] <in.txt>\n");
+		fprintf(stderr, "Options:\n");
+		fprintf(stderr, "  -p STR     output prefix []\n");
 		return 1;
 	}
 	h = ca_kmer_read(argv[o.ind]);

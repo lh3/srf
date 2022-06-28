@@ -5,7 +5,7 @@ CXXFLAGS=	$(CFLAGS)
 CPPFLAGS=
 INCLUDES=
 OBJS=
-PROG=		circasm fmd-occ
+PROG=		srf
 LIBS=		-lz
 
 WFA_ROOT=WFA2-lib
@@ -26,20 +26,20 @@ endif
 
 all:$(PROG)
 
-circasm:$(OBJS) circasm.o
+srf:$(OBJS) srf.o
 		$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
 
 fmd-occ:rld0.o fmd-occ.o
 		$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
 
 clean:
-		rm -fr gmon.out *.o a.out $(PROG) *~ *.a *.dSYM
+		rm -fr gmon.out *.o a.out $(PROG) fmd-occ *~ *.a *.dSYM
 
 depend:
 		(LC_ALL=C; export LC_ALL; makedepend -Y -- $(CFLAGS) $(DFLAGS) -- *.c *.cpp)
 
 # DO NOT DELETE
 
-circasm.o: khashl.h ketopt.h kseq.h ksort.h
 fmd-occ.o: ketopt.h rld0.h
 rld0.o: rld0.h
+srf.o: khashl.h ketopt.h kseq.h ksort.h
