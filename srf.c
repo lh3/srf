@@ -71,16 +71,17 @@ static inline uint32_t ca_kmer_hash(const ca_kmer_t x)
 
 KHASHL_CSET_INIT(, ca_kh_t, ca_kh, ca_kmer_t, ca_kmer_hash, ca_kmer_eq)
 
-void ca_kmer_canonical(ca_kmer_t *t, uint8_t *swap)
+int32_t ca_kmer_canonical(ca_kmer_t *t, uint8_t *swap)
 {
 	if (memcmp(t->seq[0], t->seq[1], t->len) > 0) {
 		memcpy(swap, t->seq[0], t->len);
 		memcpy(t->seq[0], t->seq[1], t->len);
 		memcpy(t->seq[1], swap, t->len);
-	}
+		return 1;
+	} else return 0;
 }
 
-void ca_kmer_append(ca_kmer_t *t, int32_t len, const uint8_t *seq, int32_t c, uint8_t *swap)
+int32_t ca_kmer_append(ca_kmer_t *t, int32_t len, const uint8_t *seq, int32_t c, uint8_t *swap)
 {
 	int32_t i;
 	t->len = len;
@@ -88,7 +89,7 @@ void ca_kmer_append(ca_kmer_t *t, int32_t len, const uint8_t *seq, int32_t c, ui
 	t->seq[0][len - 1] = c;
 	for (i = 0; i < len; ++i)
 		t->seq[1][len - i - 1] = 3 - t->seq[0][i];
-	ca_kmer_canonical(t, swap);
+	return ca_kmer_canonical(t, swap);
 }
 
 unsigned char seq_nt4_table[256] = {
@@ -259,6 +260,134 @@ void ca_gen(ca_kh_t *h, const char *prefix)
 	free(swap);
 }
 
+typedef struct {
+	uint32_t par;
+	int32_t w;
+} ninfo_t;
+
+typedef struct {
+	uint32_t k;
+	int32_t cnt;
+	int32_t w;
+} elem_t;
+
+typedef struct {
+	int32_t n, m;
+	elem_t *a;
+} heap_t;
+
+#define CA_PAR_UNSET ((uint32_t)-1)
+#define CA_PAR_START ((uint32_t)-2)
+
+#define elem_lt(x, y) ((x).cnt < (y).cnt)
+KSORT_INIT(ca_elem, elem_t, elem_lt)
+
+static inline void heap_insert(heap_t *hp, const ca_kh_t *h, uint32_t k, int32_t w)
+{
+	elem_t *p;
+	if (hp->n == hp->m) {
+		hp->m += (hp->m>>1) + 16;
+		hp->a = Realloc(elem_t, hp->a, hp->m);
+	}
+	p = &hp->a[hp->n++];
+	p->k = k, p->w = w, p->cnt = kh_key(h, k).cnt;
+	ks_heapup_ca_elem(hp->n, hp->a);
+}
+
+static inline elem_t heap_extract_max(heap_t *hp)
+{
+	elem_t t;
+	t = hp->a[0]; // FIXME: not working if p->n == 0
+	hp->a[0] = hp->a[--(hp->n)];
+	ks_heapdown_ca_elem(0, hp->n, hp->a);
+	return t;
+}
+
+void ca_gen_heap(const ca_kh_t *h, const char *prefix)
+{
+	int32_t i, n, len, m_seq = 0;
+	uint64_t *a;
+	ninfo_t *f;
+	khint_t k;
+	uint8_t *swap;
+	char *seq = 0;
+	ca_kmer_t tmp;
+	heap_t hp = {0,0,0};
+
+	n = kh_size(h);
+	if (n == 0) return;
+
+	// collect count array a[]
+	a = Malloc(uint64_t, n);
+	for (k = 0, i = 0; k != kh_end(h); ++k)
+		if (kh_exist(h, k))
+			kh_key(h, k).k = k, kh_key(h, k).flag = (uint32_t)-1, a[i++] = (uint64_t)kh_key(h, k).cnt<<32 | k;
+
+	// sort by the descending order
+	radix_sort_ca64(a, a + n);
+	for (i = 0; i < n>>1; ++i) { // change to the descending order
+		uint64_t t = a[i];
+		a[i] = a[n - 1 - i], a[n - 1 - i] = t;
+	}
+
+	tmp = kh_key(h, (uint32_t)a[0]);
+	len = tmp.len;
+	tmp.seq[0] = Calloc(uint8_t, len * 2);
+	tmp.seq[1] = tmp.seq[0] + len;
+	swap = Calloc(uint8_t, len);
+	f = Calloc(ninfo_t, kh_end(h));
+	for (i = 0; i < kh_end(h); ++i)
+		f[i].par = CA_PAR_UNSET, f[i].w = -1;
+
+	for (i = 0; i < n; ++i) {
+		khint_t k0 = (uint32_t)a[i];
+		int32_t succ = 0;
+		if (f[k0].par != CA_PAR_UNSET) continue;
+		heap_insert(&hp, h, k0, 0);
+		f[k0].par = CA_PAR_START, f[k0].w = 0;
+		while (hp.n > 0) {
+			elem_t e;
+			ca_kmer_t *q;
+			int32_t c;
+			e = heap_extract_max(&hp);
+			if (e.k == k0 && f[k0].par != CA_PAR_START) {
+				succ = 1;
+				break;
+			}
+			q = &kh_key(h, e.k);
+			for (c = 0; c < 4; ++c) {
+				int32_t w = ca_kmer_append(&tmp, q->len, &q->seq[e.w][1], c, swap);
+				khint_t k = ca_kh_get(h, tmp);
+				if (k != kh_end(h) && (f[k].par == CA_PAR_UNSET || f[k].par == CA_PAR_START)) {
+					heap_insert(&hp, h, k, w);
+					f[k].par = e.k, f[k].w = e.w;
+				}
+			}
+		}
+		if (succ) {
+			khint_t k = f[k0].par;
+			int32_t l = 0, w = f[k0].w, t;
+			while (1) {
+				if (l == m_seq) {
+					m_seq += (m_seq>>1) + 16;
+					seq = Realloc(char, seq, m_seq);
+				}
+				seq[l++] = "ACGT"[kh_key(h, k).seq[w][0]];
+				if (k == k0) break;
+				w = f[k].w, k = f[k].par;
+			}
+			seq[l] = 0;
+			for (i = 0; i < l>>1; ++i)
+				t = seq[i], seq[i] = seq[l-i-1], seq[l-i-1] = t;
+			puts(seq);
+		}
+	}
+	free(f);
+	free(swap);
+	free(tmp.seq[0]);
+	free(a);
+}
+
 int main(int argc, char *argv[])
 {
 	int32_t c;
@@ -276,6 +405,10 @@ int main(int argc, char *argv[])
 	}
 	h = ca_kmer_read(argv[o.ind]);
 	fprintf(stderr, "[M::%s] read %d distinct k-mers\n", __func__, kh_size(h));
+#if 1
+	ca_gen_heap(h, prefix);
+#else
 	ca_gen(h, prefix);
+#endif
 	return 0;
 }
