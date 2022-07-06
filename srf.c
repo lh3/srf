@@ -281,8 +281,10 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix, int32_t min_len)
 		if (succ) {
 			khint_t k = f[k0].par;
 			int32_t j, l = 0, w = f[k0].w, t, min_cnt, max_cnt;
+			int64_t sum = 0;
 			min_cnt = max_cnt = kh_key(h, k).cnt;
 			while (1) {
+				sum += kh_key(h, k).cnt;
 				if (kh_key(h, k).cnt < min_cnt) min_cnt = kh_key(h, k).cnt;
 				if (kh_key(h, k).cnt > max_cnt) max_cnt = kh_key(h, k).cnt;
 				if (l == m_seq) {
@@ -299,7 +301,7 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix, int32_t min_len)
 				t = seq[j], seq[j] = seq[l - j - 1], seq[l - j - 1] = t;
 			putchar('>');
 			if (prefix) printf("%s#", prefix);
-			printf("circ%d-%d min=%d,max=%d\n", n_circ+1, l, min_cnt, max_cnt);
+			printf("circ%d-%d min=%d,max=%d,avg=%d\n", n_circ+1, l, min_cnt, max_cnt, (int32_t)((double)sum / l + .499));
 			puts(seq);
 			++n_circ;
 		}
@@ -329,10 +331,6 @@ int main(int argc, char *argv[])
 	}
 	h = ca_kmer_read(argv[o.ind]);
 	fprintf(stderr, "[M::%s] read %d distinct k-mers\n", __func__, kh_size(h));
-#if 1
 	ca_gen_heap(h, prefix, 5);
-#else
-	ca_gen(h, prefix);
-#endif
 	return 0;
 }
