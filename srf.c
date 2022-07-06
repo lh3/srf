@@ -261,7 +261,7 @@ void ca_gen(ca_kh_t *h, const char *prefix)
 }
 
 typedef struct {
-	uint32_t par, k0;
+	uint32_t par;
 	int32_t w;
 } ninfo_t;
 
@@ -303,9 +303,9 @@ static inline elem_t heap_extract_max(heap_t *hp)
 	return t;
 }
 
-void ca_gen_heap(const ca_kh_t *h, const char *prefix)
+void ca_gen_heap(const ca_kh_t *h, const char *prefix, int32_t min_len)
 {
-	int32_t i, n, len, m_seq = 0;
+	int32_t i, n, len, m_seq = 0, n_circ = 0;
 	uint64_t *a;
 	ninfo_t *f;
 	khint_t k;
@@ -337,7 +337,7 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix)
 	swap = Calloc(uint8_t, len);
 	f = Calloc(ninfo_t, kh_end(h));
 	for (i = 0; i < kh_end(h); ++i)
-		f[i].par = CA_PAR_UNSET, f[i].w = -1, f[i].k0 = CA_PAR_UNSET;
+		f[i].par = CA_PAR_UNSET, f[i].w = -1;
 
 	for (i = 0; i < n; ++i) {
 		khint_t k0 = (uint32_t)a[i];
@@ -361,18 +361,18 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix)
 				khint_t k = ca_kh_get(h, tmp);
 				if (k == kh_end(h)) continue;
 				if (f[k].par == CA_PAR_UNSET || (f[k].par == CA_PAR_START && f[k].w == 0)) {
-					//if (k0 == 1137185) printf("X\t%d\t%d:%d -> %d:%d\n", k0, e.k, e.w, k, w);
 					heap_insert(&hp, h, k, w);
-					f[k].par = e.k, f[k].w = e.w, f[k].k0 = k0;
+					f[k].par = e.k, f[k].w = e.w;
 				}
 			}
 		}
 		if (succ) {
 			khint_t k = f[k0].par;
-			int32_t l = 0, w = f[k0].w, t;
-			//printf("==> start: %d\n", k0);
+			int32_t l = 0, w = f[k0].w, t, min_cnt, max_cnt;
+			min_cnt = max_cnt = kh_key(h, k).cnt;
 			while (1) {
-				//printf("%d\t%d\n", k, f[k].k0);
+				if (kh_key(h, k).cnt < min_cnt) min_cnt = kh_key(h, k).cnt;
+				if (kh_key(h, k).cnt > max_cnt) max_cnt = kh_key(h, k).cnt;
 				if (l == m_seq) {
 					m_seq += (m_seq>>1) + 16;
 					seq = Realloc(char, seq, m_seq);
@@ -384,7 +384,11 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix)
 			seq[l] = 0;
 			for (i = 0; i < l>>1; ++i)
 				t = seq[i], seq[i] = seq[l-i-1], seq[l-i-1] = t;
+			putchar('>');
+			if (prefix) printf("%s#", prefix);
+			printf("circ%d-%d-%d-%d\n", n_circ+1, l, min_cnt, max_cnt);
 			puts(seq);
+			++n_circ;
 		}
 	}
 	free(f);
@@ -395,23 +399,25 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix)
 
 int main(int argc, char *argv[])
 {
-	int32_t c;
+	int32_t c, min_len = 5;
 	ketopt_t o = KETOPT_INIT;
 	ca_kh_t *h;
 	char *prefix = 0;
-	while ((c = ketopt(&o, argc, argv, 1, "p:", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "p:l:", 0)) >= 0) {
 		if (c == 'p') prefix = o.arg;
+		else if (c == 'l') min_len = atoi(o.arg);
 	}
 	if (o.ind == argc) {
 		fprintf(stderr, "Usage: srf [options] <in.txt>\n");
 		fprintf(stderr, "Options:\n");
 		fprintf(stderr, "  -p STR     output prefix []\n");
+		fprintf(stderr, "  -l INT     min length [%d]\n", min_len);
 		return 1;
 	}
 	h = ca_kmer_read(argv[o.ind]);
 	fprintf(stderr, "[M::%s] read %d distinct k-mers\n", __func__, kh_size(h));
 #if 1
-	ca_gen_heap(h, prefix);
+	ca_gen_heap(h, prefix, 5);
 #else
 	ca_gen(h, prefix);
 #endif
