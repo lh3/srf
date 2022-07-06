@@ -261,7 +261,7 @@ void ca_gen(ca_kh_t *h, const char *prefix)
 }
 
 typedef struct {
-	uint32_t par;
+	uint32_t par, k0;
 	int32_t w;
 } ninfo_t;
 
@@ -337,12 +337,13 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix)
 	swap = Calloc(uint8_t, len);
 	f = Calloc(ninfo_t, kh_end(h));
 	for (i = 0; i < kh_end(h); ++i)
-		f[i].par = CA_PAR_UNSET, f[i].w = -1;
+		f[i].par = CA_PAR_UNSET, f[i].w = -1, f[i].k0 = CA_PAR_UNSET;
 
 	for (i = 0; i < n; ++i) {
 		khint_t k0 = (uint32_t)a[i];
 		int32_t succ = 0;
 		if (f[k0].par != CA_PAR_UNSET) continue;
+		hp.n = 0;
 		heap_insert(&hp, h, k0, 0);
 		f[k0].par = CA_PAR_START, f[k0].w = 0;
 		while (hp.n > 0) {
@@ -358,16 +359,20 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix)
 			for (c = 0; c < 4; ++c) {
 				int32_t w = ca_kmer_append(&tmp, q->len, &q->seq[e.w][1], c, swap);
 				khint_t k = ca_kh_get(h, tmp);
-				if (k != kh_end(h) && (f[k].par == CA_PAR_UNSET || f[k].par == CA_PAR_START)) {
+				if (k == kh_end(h)) continue;
+				if (f[k].par == CA_PAR_UNSET || (f[k].par == CA_PAR_START && f[k].w == 0)) {
+					//if (k0 == 1137185) printf("X\t%d\t%d:%d -> %d:%d\n", k0, e.k, e.w, k, w);
 					heap_insert(&hp, h, k, w);
-					f[k].par = e.k, f[k].w = e.w;
+					f[k].par = e.k, f[k].w = e.w, f[k].k0 = k0;
 				}
 			}
 		}
 		if (succ) {
 			khint_t k = f[k0].par;
 			int32_t l = 0, w = f[k0].w, t;
+			//printf("==> start: %d\n", k0);
 			while (1) {
+				//printf("%d\t%d\n", k, f[k].k0);
 				if (l == m_seq) {
 					m_seq += (m_seq>>1) + 16;
 					seq = Realloc(char, seq, m_seq);
