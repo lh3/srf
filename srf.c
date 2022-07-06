@@ -322,6 +322,7 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix, int32_t min_len)
 	for (k = 0, i = 0; k != kh_end(h); ++k)
 		if (kh_exist(h, k))
 			kh_key(h, k).k = k, kh_key(h, k).flag = (uint32_t)-1, a[i++] = (uint64_t)kh_key(h, k).cnt<<32 | k;
+	assert(i == n);
 
 	// sort by the descending order
 	radix_sort_ca64(a, a + n);
@@ -368,7 +369,7 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix, int32_t min_len)
 		}
 		if (succ) {
 			khint_t k = f[k0].par;
-			int32_t l = 0, w = f[k0].w, t, min_cnt, max_cnt;
+			int32_t j, l = 0, w = f[k0].w, t, min_cnt, max_cnt;
 			min_cnt = max_cnt = kh_key(h, k).cnt;
 			while (1) {
 				if (kh_key(h, k).cnt < min_cnt) min_cnt = kh_key(h, k).cnt;
@@ -382,11 +383,12 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix, int32_t min_len)
 				w = f[k].w, k = f[k].par;
 			}
 			seq[l] = 0;
-			for (i = 0; i < l>>1; ++i)
-				t = seq[i], seq[i] = seq[l-i-1], seq[l-i-1] = t;
+			if (l < min_len) continue;
+			for (j = 0; j < l>>1; ++j)
+				t = seq[j], seq[j] = seq[l - j - 1], seq[l - j - 1] = t;
 			putchar('>');
 			if (prefix) printf("%s#", prefix);
-			printf("circ%d-%d-%d-%d\n", n_circ+1, l, min_cnt, max_cnt);
+			printf("circ%d-%d min=%d,max=%d\n", n_circ+1, l, min_cnt, max_cnt);
 			puts(seq);
 			++n_circ;
 		}
