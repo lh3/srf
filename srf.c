@@ -306,6 +306,7 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix, int32_t min_len)
 			++n_circ;
 		}
 	}
+	free(seq);
 	free(f);
 	free(swap);
 	free(tmp.seq[0]);
