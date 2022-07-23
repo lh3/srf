@@ -12,6 +12,11 @@ kmc_dump count.kmc count.txt
 
 # assemble satellite DNA
 ./srf -p prefix count.txt > srf.fa
+
+# analyze
+minimap2 -c -N1000000 -f1000 -r100,100 <(./srfutils.js enlong srf.fa) ctg.fa > srf-aln.paf
+./srfutils.js paf2bed srf-aln.paf > srf-aln.bed   # filter and extract non-overlapping regions
+./srfutils.js bed2abun srf-aln.bed > srf-aln.len  # calculate abundance of each srf contig
 ```
 
 ## Introduction
