@@ -188,6 +188,30 @@ function srf_cmd_bed2cnt(args) {
 	}
 }
 
+function srf_cmd_bed2abun(args) {
+	var c, opt = {};
+	while ((c = getopt(args, "")) != null) {
+	}
+	var buf = new Bytes();
+	var file = args[getopt.ind] == "-"? new File() : new File(args[getopt.ind]);
+	var abun = {};
+	while (file.readline(buf) >= 0) {
+		var t = buf.toString().split("\t");
+		if (abun[t[3]] == null) abun[t[3]] = [0, 0];
+		var len = parseInt(t[2]) - parseInt(t[1]);
+		abun[t[3]][0] += len;
+		abun[t[3]][1] += len * parseFloat(t[4]);
+	}
+	file.close();
+	buf.destroy();
+	var a = [];
+	for (var x in abun)
+		a.push([x, abun[x][0], abun[x][1] / abun[x][0]]);
+	a = a.sort(function(x,y) { return y[1] - x[1] });
+	for (var i = 0; i < a.length; ++i)
+		print(a[i].join("\t"));
+}
+
 function srf_cmd_paf2bed(args) {
 	var c, opt = { min_len:190, min_cov:0.9, min_iden:0.9 };
 	while ((c = getopt(args, "l:c:d:p")) != null) {
@@ -325,6 +349,7 @@ function main(args)
 		print("  filter    filter read-to-circ alignment");
 		print("  paf2bed   extract non-overlapping regions with satellites");
 		print("  bed2cnt   per-chromosome count");
+		print("  bed2abun  per-contig abundance");
 		print("  merge     merge identical sequences");
 		exit(1);
 	}
@@ -335,6 +360,7 @@ function main(args)
 	else if (cmd == 'merge') srf_cmd_merge(args);
 	else if (cmd == 'paf2bed') srf_cmd_paf2bed(args);
 	else if (cmd == 'bed2cnt') srf_cmd_bed2cnt(args);
+	else if (cmd == 'bed2abun') srf_cmd_bed2abun(args);
 	else throw Error("unrecognized command: " + cmd);
 }
 
