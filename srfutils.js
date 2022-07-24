@@ -202,7 +202,7 @@ function srf_cmd_bed2abun(args) {
 		print("Options:");
 		print("  -g INT       total length [0]");
 		print("  -a           generate data for accumulative plot");
-		print("  -b           generate data for stacked bar plot");
+		print("  -b           for stacked bar plot (<100,<1000,<2000,<5000,<10000,>=10000)");
 		print("  -l STR       label with -4");
 		return;
 	}
@@ -222,11 +222,12 @@ function srf_cmd_bed2abun(args) {
 	var a = [];
 	for (var x in abun)
 		a.push([x, abun[x][0], abun[x][1] / abun[x][0]]);
+	var tot = 0;
+	for (var i = 0; i < a.length; ++i)
+		tot += a[i][1];
+	if (opt.gsize > tot) tot = opt.gsize;
 	if (opt.accumu || opt.binplot) {
-		var b4 = [0, 0, 0, 0, 0, 0], tot = 0;
-		for (var i = 0; i < a.length; ++i)
-			tot += a[i][1];
-		if (opt.gsize > tot) tot = opt.gsize;
+		var b4 = [0, 0, 0, 0, 0, 0];
 		for (var i = 0; i < a.length; ++i) {
 			var m;
 			if ((m = /-(\d+)$/.exec(a[i][0])) == null)
@@ -255,7 +256,7 @@ function srf_cmd_bed2abun(args) {
 	} else {
 		a = a.sort(function(x,y) { return y[1] - x[1] });
 		for (var i = 0; i < a.length; ++i)
-			print(a[i].join("\t"));
+			print(a[i].join("\t"), a[i][1] / tot);
 	}
 }
 
