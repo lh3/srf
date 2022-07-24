@@ -104,8 +104,9 @@ function srf_drop_paf(opt, t) {
 		clip[0] = clip[0] < t[1] - t[3]? clip[0] : t[1] - t[3];
 	}
 	if (t[8] - t[7] < (t[8] - t[7] + clip[0] + clip[1]) * opt.min_cov) return true;
-	if (t[9] < t[10] * opt.min_iden) return true;
-	t[11] = (t[10] - t[9] + clip[0] + clip[1]) / (t[10] + clip[0] + clip[1]) * 100;
+	var iden = t[9] / (t[10] + clip[0] + clip[1]);
+	if (iden < opt.min_iden) return true;
+	t[11] = (1 - iden) * 100;
 	return false;
 }
 
@@ -189,9 +190,23 @@ function srf_cmd_bed2cnt(args) {
 }
 
 function srf_cmd_bed2abun(args) {
-	var c, opt = {};
-	while ((c = getopt(args, "")) != null) {
+	var c, opt = { accumu:false, binplot:false, gsize:0, label:"" };
+	while ((c = getopt(args, "abg:l:")) != null) {
+		if (c == 'a') opt.accumu = true;
+		else if (c == 'b') opt.binplot = true;
+		else if (c == 'g') opt.gsize = parseInt(getopt.arg);
+		else if (c == 'l') opt.label = getopt.arg;
 	}
+	if (getopt.ind == args.length) {
+		print("Usage: srfutils.js bed2abun [options] <in.bed>");
+		print("Options:");
+		print("  -g INT       total length [0]");
+		print("  -a           generate data for accumulative plot");
+		print("  -b           generate data for stacked bar plot");
+		print("  -l STR       label with -4");
+		return;
+	}
+
 	var buf = new Bytes();
 	var file = args[getopt.ind] == "-"? new File() : new File(args[getopt.ind]);
 	var abun = {};
@@ -207,9 +222,41 @@ function srf_cmd_bed2abun(args) {
 	var a = [];
 	for (var x in abun)
 		a.push([x, abun[x][0], abun[x][1] / abun[x][0]]);
-	a = a.sort(function(x,y) { return y[1] - x[1] });
-	for (var i = 0; i < a.length; ++i)
-		print(a[i].join("\t"));
+	if (opt.accumu || opt.binplot) {
+		var b4 = [0, 0, 0, 0, 0, 0], tot = 0;
+		for (var i = 0; i < a.length; ++i)
+			tot += a[i][1];
+		if (opt.gsize > tot) tot = opt.gsize;
+		for (var i = 0; i < a.length; ++i) {
+			var m;
+			if ((m = /-(\d+)$/.exec(a[i][0])) == null)
+				throw Error("failed to match format");
+			var len = parseInt(m[1]);
+			a[i].push(len);
+			if (len < 100) b4[0] += a[i][1];
+			else if (len < 1000) b4[1] += a[i][1];
+			else if (len < 2000) b4[2] += a[i][1];
+			else if (len < 5000) b4[3] += a[i][1];
+			else if (len < 10000) b4[4] += a[i][1];
+			else b4[5] += a[i][1];
+		}
+		if (opt.accumu) {
+			a.sort(function(x,y) { return x[3] - y[3] });
+			for (var i = 0, c = 0; i < a.length; ++i) {
+				c += a[i][1] / tot;
+				print(c, a[i][3], a[i][1]);
+			}
+		} else {
+			var label = opt.label != ""? opt.label : args[getopt.ind];
+			for (var i = 0; i < b4.length; ++i)
+				b4[i] /= tot;
+			print(label, b4.join("\t"));
+		}
+	} else {
+		a = a.sort(function(x,y) { return y[1] - x[1] });
+		for (var i = 0; i < a.length; ++i)
+			print(a[i].join("\t"));
+	}
 }
 
 function srf_cmd_paf2bed(args) {
