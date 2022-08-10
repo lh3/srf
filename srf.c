@@ -332,6 +332,6 @@ int main(int argc, char *argv[])
 	}
 	h = ca_kmer_read(argv[o.ind]);
 	fprintf(stderr, "[M::%s] read %d distinct k-mers\n", __func__, kh_size(h));
-	ca_gen_heap(h, prefix, 5);
+	ca_gen_heap(h, prefix, min_len);
 	return 0;
 }
