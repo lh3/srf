@@ -190,12 +190,13 @@ function srf_cmd_bed2cnt(args) {
 }
 
 function srf_cmd_bed2abun(args) {
-	var c, opt = { accumu:false, binplot:false, gsize:0, label:"" };
-	while ((c = getopt(args, "abg:l:")) != null) {
+	var c, opt = { accumu:false, binplot:false, gsize:0, label:"", incl_all:false };
+	while ((c = getopt(args, "abcg:l:")) != null) {
 		if (c == 'a') opt.accumu = true;
 		else if (c == 'b') opt.binplot = true;
 		else if (c == 'g') opt.gsize = parseInt(getopt.arg);
 		else if (c == 'l') opt.label = getopt.arg;
+		else if (c == 'c') opt.incl_all = true;
 	}
 	if (getopt.ind == args.length) {
 		print("Usage: srfutils.js bed2abun [options] <in.bed>");
@@ -203,7 +204,8 @@ function srf_cmd_bed2abun(args) {
 		print("  -g INT       total length [0]");
 		print("  -a           generate data for accumulative plot");
 		print("  -b           for stacked bar plot (<100,<1000,<2000,<5000,<10000,>=10000)");
-		print("  -l STR       label with -4");
+		print("  -c           do not filter BED records by last column");
+		print("  -l STR       label to output");
 		return;
 	}
 
@@ -212,6 +214,7 @@ function srf_cmd_bed2abun(args) {
 	var abun = {};
 	while (file.readline(buf) >= 0) {
 		var t = buf.toString().split("\t");
+		if (!opt.incl_all && parseInt(t[7]) == 0) continue;
 		if (abun[t[3]] == null) abun[t[3]] = [0, 0];
 		var len = parseInt(t[2]) - parseInt(t[1]);
 		abun[t[3]][0] += len;
@@ -282,8 +285,9 @@ function srf_cmd_paf2bed(args) {
 	var b = [], sum = {};
 
 	function process(b) {
+		if (b.length == 0) return;
 		b = b.sort(function(x,y) { return x[2]-y[2] });
-		var j0 = 0;
+		var tlen = b[0][1], j0 = 0;
 		for (var j = 0; j < b.length; ++j) {
 			var t = b[j];
 			while (j0 < b.length && b[j0][3] <= t[2])
@@ -311,11 +315,19 @@ function srf_cmd_paf2bed(args) {
 		}
 		b.length = k;
 		if (k == 0) return;
-		en = b[0][13];
+		var en = b[0][13];
 		var sc = (b[0][13] - b[0][12]) * b[0][11];
+		var c = [];
 		for (var j = 1, j0 = 0; j <= b.length; ++j) {
 			if (j == b.length || b[j][0] != b[j0][0] || b[j][5] != b[j0][5] || b[j][12] != en) {
-				print(b[j0][0], b[j0][12], en, b[j0][5], sc / (en - b[j0][12]));
+				//print(b[j0][0], b[j0][12], en, b[j0][5], sc / (en - b[j0][12]));
+				var m, keep = 0, st = b[j0][12];
+				if ((m = /-(\d+)$/.exec(b[j0][5])) == null)
+					throw Error("Wrong contig format");
+				var len = parseInt(m[1]);
+				if (en - st > len * 2) keep = 1;
+				else if ((st < 5 || tlen - en < 5) && en - st > len * 1.5) keep = 1;
+				c.push([b[j0][0], st, en, b[j0][5], sc / (en - b[j0][12]), tlen, len, keep]);
 				if (j < b.length)
 					j0 = j, en = b[j][13], sc = (b[j][13] - b[j][12]) * b[j][11];
 			} else {
@@ -323,6 +335,19 @@ function srf_cmd_paf2bed(args) {
 			}
 		}
 		b.length = 0;
+		for (var j = 0; j < c.length; ++j) {
+			if (!c[j][7]) {
+				for (var k = j - 1; k >= 0; --k) {
+					if (c[j][1] - c[k][2] >= c[j][6]) break;
+					if (c[j][3] == c[k][3]) c[j][7] = c[k][7] = 2;
+				}
+				for (var k = j + 1; k < c.length; ++k) {
+					if (c[k][1] - c[j][2] >= c[j][6]) break;
+					if (c[j][3] == c[k][3]) c[j][7] = c[k][7] = 2;
+				}
+			}
+			print(c[j].join("\t"));
+		}
 	}
 
 	while (file.readline(buf) >= 0) {
