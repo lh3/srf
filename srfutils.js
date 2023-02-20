@@ -211,20 +211,24 @@ function srf_cmd_bed2abun(args) {
 
 	var buf = new Bytes();
 	var file = args[getopt.ind] == "-"? new File() : new File(args[getopt.ind]);
-	var abun = {};
+	var abun = {}, abun_all = {};
 	while (file.readline(buf) >= 0) {
 		var t = buf.toString().split("\t");
-		if (!opt.incl_all && parseInt(t[7]) == 0) continue;
 		if (abun[t[3]] == null) abun[t[3]] = [0, 0];
+		if (abun_all[t[3]] == null) abun_all[t[3]] = [0, 0];
 		var len = parseInt(t[2]) - parseInt(t[1]);
-		abun[t[3]][0] += len;
-		abun[t[3]][1] += len * parseFloat(t[4]);
+		if (!opt.incl_all && parseInt(t[7]) > 0) {
+			abun[t[3]][0] += len;
+			abun[t[3]][1] += len * parseFloat(t[4]);
+		}
+		abun_all[t[3]][0] += len;
+		abun_all[t[3]][1] += len * parseFloat(t[4]);
 	}
 	file.close();
 	buf.destroy();
 	var a = [];
 	for (var x in abun)
-		a.push([x, abun[x][0], abun[x][1] / abun[x][0]]);
+		a.push([x, abun[x][0], abun[x][1] / abun[x][0], abun_all[x][0]]);
 	var tot = 0;
 	for (var i = 0; i < a.length; ++i)
 		tot += a[i][1];
@@ -259,7 +263,7 @@ function srf_cmd_bed2abun(args) {
 	} else {
 		a = a.sort(function(x,y) { return y[1] - x[1] });
 		for (var i = 0; i < a.length; ++i)
-			print(a[i].join("\t"), a[i][1] / tot);
+			print(a[i][0], a[i][1], a[i][2], a[i][1] / tot, a[i][3] / tot);
 	}
 }
 
