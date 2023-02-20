@@ -111,7 +111,7 @@ unsigned char seq_nt4_table[256] = {
 	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4
 };
 
-ca_kh_t *ca_kmer_read(const char *fn)
+ca_kh_t *ca_kmer_read(const char *fn, int min_cnt)
 {
 	ca_kh_t *h = 0;
 	gzFile fp;
@@ -121,7 +121,7 @@ ca_kh_t *ca_kmer_read(const char *fn)
 	ca_kmer_t kmer;
 	uint8_t *swap = 0;
 
-	fp = gzopen(fn, "rb");
+	fp = strcmp(fn, "-") == 0? gzdopen(0, "rb") : gzopen(fn, "rb");
 	if (fp == 0) return 0;
 	ks = ks_init(fp);
 	h = ca_kh_init();
@@ -137,7 +137,7 @@ ca_kh_t *ca_kmer_read(const char *fn)
 				break;
 		assert(i + 1 < str.l);
 		cnt = strtol(&str.s[i+1], &p, 10);
-		if (cnt <= 0) continue;
+		if (cnt <= 0 || cnt < min_cnt) continue;
 		kmer.cnt = cnt;
 		if (kmer.len < 0) {
 			assert((i&1) == 1);
@@ -315,22 +315,24 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix, int32_t min_len)
 
 int main(int argc, char *argv[])
 {
-	int32_t c, min_len = 5;
+	int32_t c, min_len = 5, min_cnt = 1;
 	ketopt_t o = KETOPT_INIT;
 	ca_kh_t *h;
 	char *prefix = 0;
-	while ((c = ketopt(&o, argc, argv, 1, "p:l:", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "p:l:c:", 0)) >= 0) {
 		if (c == 'p') prefix = o.arg;
 		else if (c == 'l') min_len = atoi(o.arg);
+		else if (c == 'c') min_cnt = atoi(o.arg);
 	}
 	if (o.ind == argc) {
 		fprintf(stderr, "Usage: srf [options] <in.txt>\n");
 		fprintf(stderr, "Options:\n");
 		fprintf(stderr, "  -p STR     output prefix []\n");
 		fprintf(stderr, "  -l INT     min length [%d]\n", min_len);
+		fprintf(stderr, "  -c INT     min count [%d]\n", min_cnt);
 		return 1;
 	}
-	h = ca_kmer_read(argv[o.ind]);
+	h = ca_kmer_read(argv[o.ind], min_cnt);
 	fprintf(stderr, "[M::%s] read %d distinct k-mers\n", __func__, kh_size(h));
 	ca_gen_heap(h, prefix, min_len);
 	return 0;
