@@ -268,11 +268,12 @@ function srf_cmd_bed2abun(args) {
 }
 
 function srf_cmd_paf2bed(args) {
-	var c, opt = { min_len:190, min_cov:0.9, min_iden:0.9 };
-	while ((c = getopt(args, "l:c:d:p")) != null) {
+	var c, opt = { min_len:190, min_cov:0.9, min_iden:0.9, algo:1 };
+	while ((c = getopt(args, "l:c:d:pa:")) != null) {
 		if (c == 'l') opt.min_len = parseInt(getopt.arg);
 		else if (c == 'c') opt.min_cov = parseFloat(getopt.arg);
 		else if (c == 'd') opt.min_iden = parseFloat(getopt.arg);
+		else if (c == 'a') opt.algo = parseInt(getopt.arg);
 	}
 	if (args.length == getopt.ind) {
 		print("Usage: srfutils.js paf2bed [options] <in.paf>");
@@ -286,9 +287,9 @@ function srf_cmd_paf2bed(args) {
 	}
 	var buf = new Bytes();
 	var file = args[getopt.ind] == "-"? new File() : new File(args[getopt.ind]);
-	var b = [], sum = {};
+	var b = [];
 
-	function process(b) {
+	function process0(b) {
 		if (b.length == 0) return;
 		b = b.sort(function(x,y) { return x[2]-y[2] });
 		var tlen = b[0][1], j0 = 0;
@@ -318,7 +319,7 @@ function srf_cmd_paf2bed(args) {
 			b[k++] = t;
 		}
 		b.length = k;
-		if (k == 0) return;
+		if (b.length == 0) return;
 		var en = b[0][13];
 		var sc = (b[0][13] - b[0][12]) * b[0][11];
 		var c = [];
@@ -327,7 +328,7 @@ function srf_cmd_paf2bed(args) {
 				//print(b[j0][0], b[j0][12], en, b[j0][5], sc / (en - b[j0][12]));
 				var m, keep = 0, st = b[j0][12];
 				if ((m = /-(\d+)$/.exec(b[j0][5])) == null)
-					throw Error("Wrong contig format");
+					throw Error("Wrong contig format: " + b[j0][5]);
 				var len = parseInt(m[1]);
 				if (en - st > len * 2) keep = 1;
 				else if ((st < 5 || tlen - en < 5) && en - st > len * 1.5) keep = 1;
@@ -342,16 +343,101 @@ function srf_cmd_paf2bed(args) {
 		for (var j = 0; j < c.length; ++j) {
 			if (!c[j][7]) {
 				for (var k = j - 1; k >= 0; --k) {
-					if (c[j][1] - c[k][2] >= c[j][6]) break;
+					if (c[j][1] - c[k][2] >= c[j][6] * 1.5) break;
 					if (c[j][3] == c[k][3]) c[j][7] = c[k][7] = 2;
 				}
 				for (var k = j + 1; k < c.length; ++k) {
-					if (c[k][1] - c[j][2] >= c[j][6]) break;
+					if (c[k][1] - c[j][2] >= c[j][6] * 1.5) break;
 					if (c[j][3] == c[k][3]) c[j][7] = c[k][7] = 2;
 				}
 			}
 			print(c[j].join("\t"));
 		}
+	}
+
+	function output1(uj, v) {
+
+		function appendv(v, uj, st, en) {
+			var added = false;
+			if (en == st) return;
+			if (v.length > 0) {
+				var ve = v[v.length - 1];
+				if (ve[0] == uj[0] && ve[3] == uj[5] && ve[2] >= st && en > ve[1]) {
+					if (ve[2] < en) { // something to add
+						ve[4] = (ve[4] * (ve[2] - ve[1]) + uj[11] * (en - ve[2])) / (en - ve[1]); // update the weighted identity
+						ve[2] = en;
+					}
+					added = true;
+				}
+			}
+			if (!added)
+				v.push([uj[0], st, en, uj[5], uj[11], uj[1], 0, 0]);
+		}
+
+		if (uj[14] == false) return;
+		var w = uj[13], st1 = uj[12], x = [];
+		for (var i = 0; i < w.length; ++i)
+			if (w[i][1] > st1)
+				x.push([w[i][0] > st1? w[i][0] : st1, w[i][1]]);
+		if (x.length > 0) {
+			var st = x[0][0], en = x[0][1], y = [];
+			for (var i = 1; i < x.length; ++i) { // de-overlap blocked intervals
+				if (x[i][0] > en) {
+					y.push([st, en]);
+					st = x[i][0], en = x[i][1];
+				} else en = en > x[i][1]? en : x[i][1];
+			}
+			y.push([st, en]);
+			// output unblocked intervals
+			if (st1 < y[0][0])
+				appendv(v, uj, st1, y[0][0]);
+			for (var i = 1; i < y.length; ++i)
+				appendv(v, uj, y[i-1][1], y[i][0]);
+			if (y[y.length-1][1] < uj[3])
+				appendv(v, uj, y[y.length-1][1], uj[3]);
+		} else appendv(v, uj, st1, uj[3]);
+	}
+
+	function process1(b) {
+		if (b.length == 0) return;
+		b = b.sort(function(x,y) { return x[2]-y[2] });
+		var u = [], v = [];
+		while (b.length) {
+			var t = b.shift(), st = t[2];
+			for (var j = 0; j < u.length; ++j) {
+				var uj = u[j];
+				if (uj[0] != t[0] || uj[3] <= t[2]) { // t doesn't overlap with u[j]
+					if (uj[14]) output1(uj, v);
+					uj[14] = false;
+				} else if (t[3] <= uj[3]) { // t is contained in u[j]
+					if (t[11] >= uj[11]) st = t[3]; // u[j] is better
+					else uj[13].push([t[2], t[3]]);
+				} else { // t overlaps with u[j], but not contained
+					if (t[11] >= uj[11]) st = st > uj[3]? st : uj[3];
+					else uj[13].push([t[2], uj[3]]);
+				}
+			}
+			var n_drop = 0;
+			for (var j = 0; j < u.length; ++j) { // count out-of-range records from the beginning of u[]
+				if (u[j][0] == t[0] && u[j][3] > t[2])
+					break;
+				else ++n_drop;
+			}
+			for (var j = 0; j < n_drop; ++j) // drop out-of-range records at the beginning of u[]
+				u.shift();
+			if (st >= t[3]) continue; // skip t
+			t[12] = st, t[13] = [], t[14] = true;
+			u.push(t);
+		}
+		for (var j = 0; j < u.length; ++j)
+			output1(u[j], v);
+		for (var j = 0; j < v.length; ++j)
+			print(v[j].join("\t"));
+	}
+
+	function process(b) {
+		if (opt.algo == 0) process0(b);
+		else if (opt.algo == 1) process1(b);
 	}
 
 	while (file.readline(buf) >= 0) {
@@ -364,9 +450,6 @@ function srf_cmd_paf2bed(args) {
 		b.push(t);
 	}
 	process(b);
-	if (!opt.print)
-		for (var x in sum)
-			print(x, sum[x]);
 	file.close();
 	buf.destroy();
 }
