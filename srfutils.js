@@ -281,6 +281,7 @@ function srf_cmd_paf2bed(args) {
 		print("  -l INT      min alignment length [" + opt.min_len + "]");
 		print("  -c FLOAT    min coverage [" + opt.min_cov + "]");
 		print("  -d FLOAT    min identity [" + opt.min_iden + "]");
+		print("  -a INT      algorithm (0: old; 1: new) [" + opt.algo + "]");
 		print("Notes: suggested minimap2 setting:");
 		print("  minimap2 -c -N1000000 -f1000 -r100,100 <(srfutils.js enlong circ.fa) reads.fa");
 		return 1;
@@ -370,8 +371,11 @@ function srf_cmd_paf2bed(args) {
 					added = true;
 				}
 			}
-			if (!added)
-				v.push([uj[0], st, en, uj[5], uj[11], uj[1], 0, 0]);
+			if (!added) {
+				var m, srf_len;
+				srf_len = (m = /-(\d+)$/.exec(uj[5])) != null? parseInt(m[1]) : uj[6];
+				v.push([uj[0], st, en, uj[5], uj[11], uj[1], srf_len, 0]);
+			}
 		}
 
 		if (uj[14] == false) return;
@@ -396,6 +400,7 @@ function srf_cmd_paf2bed(args) {
 			if (y[y.length-1][1] < uj[3])
 				appendv(v, uj, y[y.length-1][1], uj[3]);
 		} else appendv(v, uj, st1, uj[3]);
+		uj[14] = false;
 	}
 
 	function process1(b) {
@@ -408,7 +413,6 @@ function srf_cmd_paf2bed(args) {
 				var uj = u[j];
 				if (uj[0] != t[0] || uj[3] <= t[2]) { // t doesn't overlap with u[j]
 					if (uj[14]) output1(uj, v);
-					uj[14] = false;
 				} else if (t[3] <= uj[3]) { // t is contained in u[j]
 					if (t[11] >= uj[11]) st = t[3]; // u[j] is better
 					else uj[13].push([t[2], t[3]]);
@@ -426,11 +430,40 @@ function srf_cmd_paf2bed(args) {
 			for (var j = 0; j < n_drop; ++j) // drop out-of-range records at the beginning of u[]
 				u.shift();
 			if (st >= t[3]) continue; // skip t
-			t[12] = st, t[13] = [], t[14] = true;
+			t[12] = st, t[13] = [], t[14] = true; // t[13]: list of blocked intervals; t[14]: outputted or not
 			u.push(t);
 		}
 		for (var j = 0; j < u.length; ++j)
 			output1(u[j], v);
+		v = v.sort(function(x,y) { return x[1]-y[1] });
+		// filter by nearby hits
+		for (var j = 0; j < v.length; ++j) {
+			if (v[j][2] - v[j][1] >= v[j][6] * 2.0) v[j][7] = 1;
+			else if (v[j][2] - v[j][1] >= v[j][6] * 1.5 && (v[j][5] - v[j][2] < 5 || v[j][1] < 5)) v[j][7] = 1; // relaxed at the edge
+		}
+		for (var j = 0; j < v.length; ++j) {
+			var srf_len = v[j][6], lj = v[j][2] - v[j][1];
+			if (v[j][7] == 1) continue;
+			for (var k = j - 1; k >= 0; --k) {
+				if (v[j][1] - v[k][2] > srf_len * 3.0) break;
+				if (v[k][3] == v[j][3]) lj += v[k][2] - v[k][1];
+			}
+			for (var k = j + 1; k < v.length; ++k) {
+				if (v[k][1] - v[j][2] > srf_len * 3.0) break;
+				if (v[k][3] == v[j][3]) lj += v[k][2] - v[k][1];
+			}
+			if (lj >= srf_len * 2.0) {
+				for (var k = j - 1; k >= 0; --k) {
+					if (v[j][1] - v[k][2] > srf_len * 2.0) break;
+					if (v[k][3] == v[j][3] && v[k][7] == 0) v[k][7] = 2;
+				}
+				for (var k = j + 1; k < v.length; ++k) {
+					if (v[k][1] - v[j][2] > srf_len * 2.0) break;
+					if (v[k][3] == v[j][3] && v[k][7] == 0) v[k][7] = 2;
+				}
+			}
+		}
+		// output
 		for (var j = 0; j < v.length; ++j)
 			print(v[j].join("\t"));
 	}
