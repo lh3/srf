@@ -194,7 +194,7 @@ function srf_cmd_bed2abun(args) {
 	while ((c = getopt(args, "abcg:l:")) != null) {
 		if (c == 'a') opt.accumu = true;
 		else if (c == 'b') opt.binplot = true;
-		else if (c == 'g') opt.gsize = parseInt(getopt.arg);
+		else if (c == 'g') opt.gsize = parseFloat(getopt.arg);
 		else if (c == 'l') opt.label = getopt.arg;
 		else if (c == 'c') opt.incl_all = true;
 	}
