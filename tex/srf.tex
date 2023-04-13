@@ -84,7 +84,7 @@ reads but it requires known monomer sequences.
 With improved sequencing technologies, it is now possible to assemble through
 human centromeres~\citep{Nurk:2022up}. More recent methods, including
 NTRprism~\citep{Altemose:2022tv}, HORmon~\citep{Kunyavskaya:2022tx} and
-HiCAT~\citep{Gao2022.08.07.502881}, can identify of detailed
+HiCAT~\citep{Gao2022.08.07.502881}, can identify detailed
 chromosome-specific HOR patterns from complete SatDNA sequences in human. These
 methods demand high-quality assembly and rich prior knowledge on SatDNA in the
 studied species. However, the finished human genome, CHM13, was derived from a
@@ -107,7 +107,7 @@ on the monomer sequence.
 
 In a SatDNA array ``{\sf BBBBBB$\cdots$}'', suppose every monomer ``{\sf B}''
 is identical to each other. Under a long enough $k$, the $k$-mer de Bruijn
-graph of the SatDNA array will be be a single cycle.  When there are
+graph of the SatDNA array will be a single cycle.  When there are
 differences between monomers, the de Bruijn graph will not be a simple cycle.
 When there are many different monomers, the de Bruijn graph can become very
 complex and cannot be resolved with classical graph cleaning
@@ -567,14 +567,14 @@ Species & Common name & Source \\
 \end{tabular}}{}
 \end{table}
 
-\begin{figure}\label{fig:dtol}
+\begin{figure}
 \includegraphics[width=.49\textwidth]{hor-plot}
-\caption{Abundance of satellite DNA in 21 species.}
+\caption{Abundance of satellite DNA in 21 species.}\label{fig:dtol}
 \end{figure}
 
-We randomly selected 15 species from the Darwin Tree of Life project and
+We randomly selected 14 species from the Darwin Tree of Life project and
 collected two species from \citet{Hon:2020aa} (Table~\ref{tab:dtol}). We applied
-SRF to these species and called satellite DNAs (Fig.~\ref{fig:dtol}).
+SRF to these species and several species described previously, and called satellite DNAs (Fig.~\ref{fig:dtol}).
 SRF may reconstruct mitochondria or chloroplast from sequence reads.
 We manually removed them based on NCBI BLAST against the nt database.
 
@@ -664,7 +664,7 @@ output in the default setting.
 
 We estimated the approximate read depth by dividing the total number of read
 bases by the number of bases in the reference genome or the corresponding
-read assembly. We counted 151-mers with {\tt kmc -fq -k151 -ciXX -cs100000},
+read assembly. We counted 151-mers with {\tt kmc -fq -k151 -ciXX -cs1000000},
 where {\tt XX} is 10 times the average read depth of each sample.
 
 \subsection{Estimating the abundance of SatDNA}
