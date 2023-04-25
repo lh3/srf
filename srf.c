@@ -287,7 +287,7 @@ void ca_gen_heap(const ca_kh_t *h, const char *prefix, int32_t min_len)
 				sum += kh_key(h, k).cnt;
 				if (kh_key(h, k).cnt < min_cnt) min_cnt = kh_key(h, k).cnt;
 				if (kh_key(h, k).cnt > max_cnt) max_cnt = kh_key(h, k).cnt;
-				if (l == m_seq) {
+				if (l + 1 >= m_seq) {
 					m_seq += (m_seq>>1) + 16;
 					seq = Realloc(char, seq, m_seq);
 				}
