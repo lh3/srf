@@ -18,6 +18,7 @@
 \bibliographystyle{apalike}
 
 \DeclareMathOperator*{\argmax}{argmax}
+\newcommand{\revised}[1]{{\color{blue}#1}}
 
 \begin{document}
 \firstpage{1}
@@ -56,7 +57,7 @@ from a few basepairs (bp) to thousands of bp in length and an entire SatDNA coul
 megabases in large genomes. Several percent of the human genome, or a couple of
 hundred megabases in total, is composed of SatDNA~\citep{Altemose:2022tv}.
 Monomers in a SatDNA array are similar in sequence but often not identical due
-to random mutations.
+to random mutations \revised{and rearrangements between satellite arrays}.
 
 In some species, SatDNA may be organized as high-order repeats
 (HORs; \citealt{Miga:2019aa}).  For example, the centromere of human chromosome 2
@@ -68,8 +69,22 @@ centromere repeats usually say ``{\sf ABCD}'' is a 4-mer HOR unit. Because we
 will often mention short nucleotide sequences in this article, we will call
 ``{\sf ABCD}'' in this example as 4-monomer HOR unit to avoid confusion.
 
+\revised{In the human genome, the active centromeric regions that centromeric
+proteins bind to are primarily composed of alpha HORs ($\alpha$HORs;
+\citealt{Altemose:2022tv}). Conversely, though, not all $\alpha$HORs are
+present in the active regions. These inactive $\alpha$HORs tend to be shorter
+than active ones. Alpha repeat monomers are also present in pericentrometic
+regions without clear HOR structures. In addition to alpha repeats, the human
+genome is also enriched with three types of human satellites (HSat1--3),
+contributing to a few percent of human genome~\citep{Altemose:2022vw}. Almost
+all these satellites are located around centromeres or on the long arm of the Y
+chromosome.}
+
 SatDNA is often not assembled in long contigs due to its repetitiveness.
-We would have to reconstruct SatDNA from raw sequence reads in this
+\revised{For example, in the human reference genome GRCh38~\citep{Schneider:2017aa},
+$\alpha$HORs were computationally generated from a Hidden Markov
+Model~\citep{Miga:2014aa}; HSats are underrepresented. As a result,}
+we would have to reconstruct SatDNA from raw sequence reads in this
 case~\citep{Lower:2018aa}.  Wei et al~\citep{Wei:2014vl} developed k-Seek to
 study SatDNA consisting of 2--10bp repeat units. Melters et
 al~\citep{Melters:2013va} applied Tandem Repeat Finder (TRF;
@@ -130,7 +145,7 @@ satellite repeats from PacBio HiFi reads in this article, we counted 151-mers
 with KMC~\citep{Kokot:2017aa} and collected 151-mers occurring $\ge$10 times
 over the average read coverage. K-mer counting may take a few tens of minutes
 for a high-coverage human dataset and is the performance bottleneck. SRF only
-takes seconds to reconstruct all repeat units after k-mer counting.
+takes seconds to reconstruct all repeat units after $k$-mer counting.
 
 \begin{table}[!hb]
 \processtable{Features of user-facing tools for SatDNA reconstruction}
@@ -153,23 +168,43 @@ whether the tool can identify high-order repeats (HORs). References to these
 tools can be found in the Introduction section.}
 \end{table}
 
+\revised{SRF would not be able to distinguish two repeat units that share an
+identical $k$-mer. $k$ needs to be large enough to separate human HORs. On the
+other hand, a large $k$ may reconstruct highly similar but non-identical repeat
+units. This is a relatively small problem as we can reduce redundancy later.
+When applying SRF to raw reads, we also need to consider the sequencing error rate
+$\epsilon$. The probability of seeing an error-free $k$-mer is $(1-\epsilon)^k$.
+If $\epsilon=0.5\%$, only 28.4\% of 251-mers are error-free.  We may miss
+high-occurrence $k$-mers with large $k$. Another practical consideration is
+that KMC by default only supports $k\le256$. Counting long $k$-mers is also
+slow.}
+
 \subsection{Estimating satellite abundance}
 
-The SRF algorithm does not provide a good estimate of repeat abundance. We
+\revised{The abundance of a repeat unit is the fraction of the genome size this
+repeat contributes to. If we assume reads are evenly distributed along the
+genome, the abundance can also be estimated as the total repeat length in reads
+over the sum of all read lengths.}
+
+\revised{We may add up counts of $k$-mers in a repeat unit to estimate the
+abundance of the repeat.  However, such an estimate does not count inexact
+repeats and would be an underestimate. To get a more accurate estimate,} we
 mapped all input sequences against reconstructed repeat units to measure the
 total length of each repeat unit.
 For human CHM13 data, we observed many diverged hits
-between HORs and scattered monomers in pericentromeric regions. We thus filtered
-hits of identity below 90\% to get more accurate HOR length estimates.
-The effect of the identity is determined by the repeat structure in a species.
+between HORs and scattered monomers in pericentromeric regions. \revised{To get
+more accurate HOR length estimates, we filtered out hits of $<$90\% identity to
+the repeat unit.} The effect of the identity \revised{filter} is determined by
+the repeat structure in a species.
 For example, switching off the filter would increase the total abundance
 estimate by 40\% for human but only by 4\% for \emph{A.thaliana}. We still
 applied this filter to all datasets even though this may lead to underestimates
 for some species.
 
-SRF may reconstruct repeat units similar in sequence. The similar repeat units
-may be mapped the same genomic locus. To remove redundancy, we only select the
-hit of the highest identity among hits overlapping on an input sequence.
+\revised{As is explained in the previous section, SRF may reconstruct two
+repeat units similar to each other, up to $(k-1)/k$ in identity. Such repeats
+may be mapped to the same genomic loci.} To remove redundancy, we only select
+the hit of the highest identity among hits overlapping on an input sequence.
 With this procedure, we map each base on an input sequence to at most one
 repeat unit.
 
@@ -180,27 +215,6 @@ with $<$2 tandem copies in the middle of a sequence or with $<$1.5 tandem
 copies when the repeat-to-read alignment reaches the end of a read. This filter
 is reliable when we apply SRF to assemblies but may miss long repeat units when
 applied to reads. We again opted for conservative estimates.
-
-\subsection{A brief introduction to human satellites}
-
-In the human genome, the most abundant satellite family is alpha satellites
-with most of them present in long alpha HORs ($\alpha$HORs). The
-consensus of the minimal alpha repeat unit is 171bp in length. The active
-centromeric regions that centromeric proteins bind to are primarily
-composed of $\alpha$HORs~\citep{Altemose:2022tv}. Conversely, though, not all
-$\alpha$HORs are present in the active regions. These inactive $\alpha$HORs
-tend to be shorter than active ones. Alpha repeat monomers are also present in
-pericentrometic regions without clear HOR structures. In addition to alpha
-repeat, the human genome is also enriched with three types of human satellites
-(HSat1--3), contributing to a few percent of human
-genome~\citep{Altemose:2022vw}. Almost all these satellites are located around
-centromeres or on the long arm of the Y chromosome.
-
-In the human reference genome GRCh38~\citep{Schneider:2017aa}, $\alpha$HORs
-were computationally generated from a Hidden Markov Model~\citep{Miga:2014aa};
-HSats are underrepresented. At present, only the T2T-CHM13
-assembly~\citep{Nurk:2022up} provides a complete representation of all
-satellite arrays.
 
 \begin{algorithm}[tb]
 \DontPrintSemicolon
@@ -269,12 +283,13 @@ chromosome retrieved from~\citet{Gao2022.08.07.502881}. Both HORmon and HiCAT
 were applicable to extracted centromeric sequences only.$^c$ SRF applied to
 each CHM13 chromosome separately. In a format ``$m$ ($L$)'', $m$ denotes the
 length of an HOR in the monomer unit and $L$ is its span on the CHM13 assembly
-in megabases. $^d$ SRF applied to CHM13 assembly, PacBio High-Fidelity (HiFi) reads and
+in megabases \revised{by mapping repeat units to CHM13}. $^d$ SRF applied to CHM13 assembly, PacBio High-Fidelity (HiFi) reads and
 Illumina short reads, respectively. $k$=101 used for Illumina reads. CHM13
-reads do not contain chrY. $^e$ SRF applied to 94 phased haploid assemblies
-produced by the Human Pangenome Reference Consortium (HPRC).  In a format ``$m$
-[$n$]'', $m$ is the monomer length and $n$ is the number of samples with the
-HOR according to manual inspection.} 
+reads do not contain chrY. \revised{``missing'' indicates no best mappings of
+SRF HORs are mapped to the corresponding chromosome.} $^e$ SRF applied to 94 phased
+haploid assemblies produced by the Human Pangenome Reference Consortium (HPRC).
+In a format ``$m$ [$n$]'', $m$ is the monomer length and $n$ is the number of
+samples with the HOR according to manual inspection.} 
 \end{table*}
 
 \subsection{Annotating satellite repeats in human T2T-CHM13}
@@ -299,7 +314,7 @@ Unlike HORmon and HiCAT which require users to provide the monomer
 sequence and prepare centromeric sequences, SRF was directly applied to
 whole chromosome sequences with no prior knowledge. In addition to active
 $\alpha$HORs, SRF identified shorter $\alpha$HOR arrays outside the active
-regions. It also found many long non-alpha satellite arrays including a repeat
+regions. It also further found many other long satellite arrays including a repeat
 unit of 1,814 bp on chr15, of 6,112 bp on chr16, of 3,569 bp on chrY and of
 2,420 bp on chrY as well. These span over one megabase and have been reported
 previously~\citep{Altemose:2022vw}.
@@ -313,7 +328,24 @@ The SRF inference on the whole T2T-CHM13 genome (column ``SRF/171 assembly'' in
 Table~\ref{tab:eval}) is close to the inference on individual chromsomes. SRF
 missed the $\alpha$HOR array on chr14 and chr21 because chr22 and chr13,
 respectively, have very similar arrays which are merged during the whole-genome
-inference.
+inference. \revised{SRF found the 68 bp beta satellite in a 1906 bp contig.
+TRF estimated the contig consists of 28 copies of the beta repeat unit with an
+average sequence identity of 77\% according to TRF. This contig occurs tandemly for 39 times on
+chr22:1531778-1606098 or 31 times on chr15:579188-638269 at $\ge$98\% identity
+to the contig sequence, suggesting these two regions locally have a high-order
+structure. Nonetheless, such a structure is not obvious in many other loci in
+the genome. SRF failed to identify the 220 bp gamma repeat possibly due to its
+lower abundance or higher sequence divergence.}
+
+\revised{The T2T consortium annotated 70.3 Mb of $\alpha$HOR sequences,
+including 61.9 Mb of active ones. From the whole genome, SRF identified
+55.4 Mb of $\alpha$HOR sequences, nearly all of which (99.98\%) are annotated
+by T2T. 96.6\% of SRF $\alpha$HORs are annotated as active by T2T
+with the remaining being inactive $\alpha$HORs. Conversely, 86.3\% of active
+and 76.0\% of all $\alpha$HOR annotated by T2T are overlapping with SRF
+$\alpha$HORs. The two numbers are increased to 96.0\% and 84.6\%, respectively,
+if we change the identity filter from 90\% to 85\%. At threshold 85\%, SRF
+found 63.5 Mb of $\alpha$HOR with 99.67\% annotated by T2T.}
 
 SRF works on sequence reads which HORmon, HiCAT and NTRprism are not
 applicable to. On PacBio High-Fidelity (HiFi) reads, SRF reconstructed
@@ -328,6 +360,13 @@ different types of input data. However, some other arrays, such as those on
 chr8 and chr19, are intrinsically harder to reconstruct. These are probably
 because monomers in a HOR may be connected in different ways, as is shown by
 \citet{Kunyavskaya:2022tx}.
+
+\revised{We used $k=171$ for human because an alpha unit is about 171 bp in
+length.  Changing $k$ to 101, 151, 201 or 251 bp generally led to the same
+conclusion: there are 24--30 $\alpha$HORs contributing to 1.65--1.81\% of
+the genome. However, with $k=51$, SRF started to miss distinct $\alpha$HORs
+that share 51-mers. It identified only 12 $\alpha$HORs contributing to 0.52\%
+of the genome.}
 
 \subsection{Satellite repeats in multiple human assemblies}
 
@@ -360,31 +399,38 @@ to identify as they do not have internal structures.
 
 \subsection{Satellite repeats in \emph{Arabidopsis thaliana}}
 
-We obtained three HiFi datasets (Table~\ref{tab:at}) and downsampled them to about
+We obtained four HiFi datasets (Table~\ref{tab:at}) and downsampled them to about
 40-fold coverage each. Col-0N and Ey15-2R were sequenced from a pool of
-multiple samples and Col-0R from a single sample.
+multiple samples and Col-0R and Col-0W from a single sample.
 
 \begin{table}[!hb]
 \processtable{\emph{A. thaliana} PacBio HiFi datasets}
 {\label{tab:at}
-\begin{tabular}{p{1.5cm}p{1.5cm}ll}
+\begin{tabular}{p{1.3cm}p{1.5cm}ll}
 \toprule
-Sample & Strain & SRA Accession & Source \\
+Sample & Strain & Accession & Source \\
 \midrule
-Col-0N & Col-0 & ERR6210723 & \citet{Naish:2021aa} \\
-Col-0R & Col-0 & ERR8666127 & \citet{Rabanal:2022aa} \\
-Ey15-2R & Eyach15-2 & ERR8666125 & \citet{Rabanal:2022aa} \\
+Col-0R & Col-0 & SRA:ERR8666127 & \citet{Rabanal:2022aa} \\
+Col-0N & Col-0 & SRA:ERR6210723 & \citet{Naish:2021aa} \\
+Col-0W & Col-0 & CNCB:CRR302668 & \citet{Wang:2022ab} \\
+Ey15-2R & Eyach15-2 & SRA:ERR8666125 & \citet{Rabanal:2022aa} \\
 \botrule
 \end{tabular}}{}
 \end{table}
 
-The \emph{A. thaliana} centromeres are composed of CEN180 satellites which are
-known to have high-order organizations~\citep{Naish:2021aa}. When we pooled the
-two Col-0 datasets and applied SRF, we reconstructed one 1-monomer, two
-2-monomers, one 3-monomer and one 6-monomer HORs. However, this result is
-unstable. If we ran SRF on each Col-0 dataset separately or on the full
-coverage, we would get different HORs. We thus ignored the HOR structures and
-focused on the abundance of CEN180 only.
+The \emph{A. thaliana} centromeres are composed of CEN180 satellites.
+\revised{Although \citet{Naish:2021aa} have identified HORs in centromeres,
+these HORs are fragmented to blocks of 429 bp in average and each centromere
+consists of over ten thouasand different HORs; monomers in a HOR may only
+differ by 2.8\%. In contrast, each human centromere only consists of one major
+type of HOR and monomers in a HOR often differ by $>$10\%. HORs in \emph{A.
+thaliana} are local and each individual HOR has low abundance.}
+
+\revised{We pooled the HiFi reads of the three Col-0 datasets, applied SRF and
+reconstructed two 1-monomer, three 2-monomers, one 3-monomer and two 7-monomer
+HORs with monomers in each HOR being 90--96\% identical. They are hard to be
+distinguished from unstructured monomers.} We thus ignored the HOR structures
+and focused on the abundance of CEN180 only.
 
 \begin{figure}[!tb]
 \includegraphics[width=.49\textwidth]{fig1}
@@ -393,48 +439,48 @@ datasets. Raw 179-mer counts in reads are normalized by coverage. A 179-mer is
 selected in the plot if it matches the CEN180 satellite and if its normalized
 count is at least 50 in one of the datasets. {\bf (a)} Counts between two
 different samples from the same strain. {\bf (b)} Counts between two different
-strains.}\label{fig:1}
+strains. \revised{{\bf (c)} Read depths averaged in 100 kb windows across
+chromosome 1. The shaded area indicates the centromere enriched with the CEN180
+satellite repeat.}}\label{fig:1}
 \end{figure}
 
-SRF estimated that 5.2\% of read bases in Col-0N and 7.5\% in Col-0R are
-composed of CEN180 satellites. Col-0R has 44\% more CEN180 satellites than
-Col-0N. To check whether this large difference is caused by an artifact, we
-inferred the relative CEN180 abundance with a different approach as follows.
-We collected 179-mers matching CEN180 and occurring $\ge$400 times in the
-pooled Col-0 dataset. We counted the total numbers of these 179-mers in Col-0N
-and Col-0R separately and normalized the counts by read bases. We found Col-0R
-has 41\% more CEN180 179-mers than Col-0N, broadly in line with the earlier
-analysis. Centromere contents may differ greatly even between two samples from
-the same strain.
+\revised{All three datasets have assemblies that go through all centromeres. We used
+CEN180 repeats reconstructed from reads to estimate the total CEN180 length in
+each assembly. We identified 9.9 Mb, 10.0 Mb and 9.9 Mb of CEN180 repeats in
+Col-0R, Col-0N and Col-0W assemblies, respectively. All assemblies have similar
+CEN180 content.
+
+Intriguingly, SRF inferred that 7.5\% of Col-0R read bases, 5.2\% of Col-0N and
+12.5\% of Col-0W are comprised of CEN180 repeats. Col-0W contains more CEN180
+than the other two samples. To check whether this large difference is caused by
+a SRF artifact, we directly extracted high-occurrence 179-mers from raw reads,
+without running SRF, and compared their counts in Col-0N and Col-0W
+(Fig.~\ref{fig:1}a). It seemed that Col-0W did have more CEN180 content. We
+further aligned Col-0N and Col-0W reads against the Col-0R assembly
+(AC:GCA\_946499705.1). Consistent with the SRF result, the read depth of the
+chr1 centromere is noticeably higher in Col-0W than in Col-0R and Col-0N
+(Fig.~\ref{fig:1}c). We saw a similar pattern on other chromosomes and on all
+raw reads without downsampling. It is not impossible that CEN180 regions in
+Col-0W were duplicated since its split from other lab samples and these
+duplicates were too recent to be separated by assemblers. We would need
+original samples to test this hypothesis.}
 
 SRF estimated that 11.5\% of Ey15-2R is composed of CEN180 satellites, higher
-than both Col-0R and Col-0N. Furthermore, while Col-0R and Col-0N share similar
+than both Col-0R and Col-0N \revised{but comparable to Col-0W}. Furthermore, while Col-0W and Col-0N share similar
 high-occurrence 179-mers that match CEN180 (Fig.~\ref{fig:1}a), Col-0 and
 Ey15-2 share few common 179-mers (Fig.~\ref{fig:1}b). The centromere sequences
-between strains are distinct both in content and in length.
+between strains are distinct both in sequence and in length.
 
-%\citet{Naish:2021aa} assembled Col-0N which is supposed to have complete
-%centromeres. We mapped sequences reconstructed from Col-0 reads to Col-0N
-%contigs. We estimated that 5.6\% of the assembly are composed of CEN180
-%satellites, higher than the estimate from Col-0N reads. To understand the
-%difference, we mapped Col-0N reads to the Col-0N assembly. We excluded regions
-%at a depth 80 or higher and calculated the coverage outside centromeres is
-%41.2-fold and inside centromeres is 32.4-fold. We suspect CEN180 is
-%overrepresented in the assembly. In addition, the rate of base
-%substitutions in alignment is higher in centromeres (0.12\% vs 0.03\%).
-%Intriguingly, the rate of base substitutions between the Col-0N assembly and
-%the Col-0R reads is lower: 0.09\% inside centromeres and 0.03\% outside
-%centromeres. We could not reconcile these numbers. The pooled sequencing of
-%Col-0N, misassembly, library preparation and data quality could all contribute.
-
-In addition to the CEN180 satellite, SRF also reconstructed a 10,067 bp rDNA
-unit from the two Col-0 datasets. It has 3.1\% abundance in Col-0R and 1.7\% in
-Col-0N. If we assume the \emph{A. thaliana} genome is 132Mb in length
-according to the Col-0N assembly, Col-0R has $\sim$400 copies of this rDNA unit
-while Col-0N has $\sim$220 copies. The Col-0N assembly~\citep{Naish:2021aa} only has seven copies,
+In addition to the CEN180 satellite, SRF also reconstructed a \revised{10,201 bp} rDNA
+unit from the \revised{three} Col-0 datasets. It has 3.1\% abundance in Col-0R, 1.7\% in
+Col-0N \revised{and 2.5\% in Col-0W}. If we assume the \emph{A. thaliana} genome is 132Mb in length
+according to the nuclear assembly, Col-0R has $\sim$400 copies of this rDNA unit
+while Col-0N has $\sim$220 copies \revised{and Col-0W has $\sim$320 copies}. The Col-0N assembly~\citep{Naish:2021aa} only has seven copies,
 located towards the telomeric ends of chr2 or chr4 short arms.  SRF did not
 reconstruct an rDNA unit from Ey15-2R. We mapped the Col-0 rDNA unit to Ey15-2R
-reads and estimated that Ey15-2R has $\sim$200 copies.
+reads and estimated that Ey15-2R has $\sim$200 copies. \revised{SRF also
+identified the (TTTAGGG)n telomere repeat but missed the less frequent
+CEN160 repeat~\citep{Round:1997aa}.}
 
 \subsection{Satellite repeats in other model organisms}
 
@@ -585,8 +631,7 @@ orca}) in the same order is also enriched with satellite DNA. Yellow-legged
 frog (\emph{R. muscosa}) is next to killer whale. SRF reconstructed many
 distant variants of a 131 bp repeat unit. On the other extreme, apples (\emph{M.
 domestica} and \emph{M. sylvestris}) barely have satellite repeats partly
-because they have transposon-rich centromeres~\citep{Zhang:2019ab}. Plants and
-fungi are generally depleted of satellites.
+because they have transposon-rich centromeres~\citep{Zhang:2019ab}.
 
 It is worth noting that our abundance estimate may be an underestimate due to
 the additional filters we used. For example, chicken mushroom (\emph{L.
@@ -614,9 +659,9 @@ exhibit rich HOR structures.
 
 SRF is a de novo assembler for reconstructing SatDNA repeat units and can
 identify most known HORs and SatDNA in well-studied species without prior
-knowledge on monomer sequences or repeat structures. It is the only de novo
+knowledge on monomer sequences or repeat structures. \revised{It is the only de novo
 algorithm for reconstructing HORs from sequence reads as well as high-quality
-assemblies. SRF only depends on a third-party k-mer counter. It is easy to run
+assemblies.} SRF only depends on a third-party k-mer counter. It is easy to run
 and fast to execute.
 
 SRF uses a greedy algorithm to assemble SatDNA repeat units. When two repeat
@@ -629,9 +674,11 @@ Meanwhile, although SRF can reconstruct known HORs in human, it may report
 incidental HORs in species, such as mouse and \emph{A. thaliana}, that only
 have weak high-order patterns. We need to run TRF~\citep{Benson:1999aa} on SRF
 contigs to obtain minimal repeat units. SRF may also assemble the same class of
-repeat into multiple similar but not identical copies. We can align assembled
-repeat units to identify such redundancy. Manual curation is recommended for a
-deeper insight into the SatDNA structure of a new species.
+repeat into multiple similar but non-identical copies. We can align assembled
+repeat units to identify such redundancy. \revised{In general, SRF only
+provides an initial list of repeat units but does not attempt to classify
+repeats into families. We recommend} manual curation for a deeper insight into
+the SatDNA structure of a new species.
 
 Estimating the abundance of SatDNA is challenging. Sometimes ancient SatDNA
 repeats may be too diverged from the assembled repeat consensus to be aligned
@@ -640,7 +687,8 @@ regions as long SatDNA arrays would affect the estimate as well. In addition,
 occasionally SatDNA units can be $>$5 kb in length. We may not observe clear
 tandem patterns in $\sim$10 kb HiFi reads, which would lead to underestimate.
 We do not have an automated algorithm to provide accurate abundance estimate in
-corner cases.
+corner cases. \revised{The lack of ground truth in non-human species further
+complicates the evaluation of abundance estimation.}
 
 SatDNA is pervasive in many species. It is however often underrepresented in
 current reference genomes such as the human GRCh38 genome and the
@@ -679,8 +727,10 @@ high-occurrence seeds; {\tt -r100,100} enables a small bandwidth of 100 bp
 during alignment.
 
 After the alignment, we used {\tt srfutils.js paf2bed} to filter poor
-alignments and to merge adjacent alignments, and then used {\tt srfutils.js
-bed2abun} to calculate the abundance of each repeat unit.
+alignments and to merge adjacent alignments. \revised{By default, this step
+filters out alignments of $<$90\% identity to the reconstructed repeat units.
+Users may adjust this threshold with option {\tt -d}.} We then used {\tt
+srfutils.js bed2abun} to calculate the abundance of each repeat unit.
 
 \subsection{Running TAREAN}
 
